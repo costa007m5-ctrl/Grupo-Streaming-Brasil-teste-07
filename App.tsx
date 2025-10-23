@@ -167,8 +167,6 @@ const AppContent: React.FC = () => {
 
   // Notifications
   const [notification, setNotification] = useState<{title: string, body: string} | null>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   // PWA Install Prompt
@@ -432,8 +430,6 @@ const AppContent: React.FC = () => {
                 title: payload.notification.title || 'Nova Notificação',
                 body: payload.notification.body || ''
             });
-            setNotifications(prev => [payload.notification, ...prev]);
-            setUnreadCount(prev => prev + 1);
         }
     });
 
@@ -484,12 +480,6 @@ const AppContent: React.FC = () => {
   const handleDismissNotificationPrompt = () => {
       setShowNotificationPrompt(false);
       sessionStorage.setItem('notification_prompt_dismissed', 'true');
-  };
-  
-  const handleNotificationClick = () => {
-    setActiveView('profile');
-    handleNavigateProfile('notifications');
-    setUnreadCount(0);
   };
 
   useEffect(() => {
@@ -1576,8 +1566,6 @@ const AppContent: React.FC = () => {
             onNavigateToSupport={() => { setActiveView('profile'); handleNavigateProfile('support'); }}
             onNavigateToAddMoney={() => { setActiveView('wallet'); handleNavigateWallet('addAmount'); }}
             onEnterAdminMode={handleEnterAdminMode}
-            notificationCount={unreadCount}
-            onNotificationClick={handleNotificationClick}
         />;
     }
   };
