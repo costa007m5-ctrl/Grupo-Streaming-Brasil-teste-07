@@ -307,10 +307,22 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    const timeoutId = setTimeout(() => {
+      console.warn('Session loading timed out, proceeding anyway');
       setLoading(false);
-    });
+    }, 5000);
+    
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(timeoutId);
+        setSession(session);
+        setLoading(false);
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        console.error('Error getting session:', error);
+        setLoading(false);
+      });
 
     const {
       data: { subscription },
@@ -328,7 +340,10 @@ const AppContent: React.FC = () => {
         }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserData = async () => {

@@ -4,15 +4,13 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    const replitDevDomain = process.env.REPLIT_DEV_DOMAIN;
+    
     return {
       server: {
         port: 5000,
         host: '0.0.0.0',
-        hmr: {
-          protocol: 'wss',
-          host: process.env.REPLIT_DEV_DOMAIN || 'localhost',
-          clientPort: 443,
-        },
+        strictPort: true,
       },
       plugins: [react()],
       define: {
