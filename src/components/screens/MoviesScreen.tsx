@@ -3,8 +3,8 @@ import { TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS, AV
 import { SearchIcon, StarIcon, CrownIcon, SpeakerWaveIcon, SpeakerXMarkIcon } from '../ui/Icons';
 import type { FeaturedContent, TvShow, Genre, AvailableService, Group } from '../../types';
 import type { ExploreDetailItem } from '../App';
-import FeaturedCarousel from './FeaturedCarousel';
-import AiMovieFinder from './AiMovieFinder';
+import FeaturedCarousel from '../ui/FeaturedCarousel';
+import AiMovieFinder from '../ui/AiMovieFinder';
 import { GoogleGenAI, Type } from "@google/genai";
 import { useTheme } from '../../contexts/ThemeContext';
 

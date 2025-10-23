@@ -25,7 +25,7 @@ import {
     ArrowUpRightIcon,
     SpeakerWaveIcon,
     ArrowDownTrayIcon,
-} from './components/Icons';
+} from '../components/ui/Icons';
 
 export const TMDB_API_KEY = 'e095c08fa4bd9162e1552eeb58fe58be';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';

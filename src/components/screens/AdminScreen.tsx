@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import type { Profile, Group, SupportTicket, SupportMessage } from '../../types';
 import { ArrowLeftIcon, UsersIcon, RectangleStackIcon, BanknotesIcon, ChartBarIcon, ChatBubbleLeftEllipsisIcon, PaperAirplaneIcon, ArrowTrendingUpIcon, SparklesIcon, BellIcon, ArrowDownTrayIcon } from '../ui/Icons';
-import AdvertisingView from './AdvertisingView';
+import AdvertisingView from '../ui/AdvertisingView';
 
 interface Transaction {
     id: number;

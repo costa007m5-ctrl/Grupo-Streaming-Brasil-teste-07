@@ -11,9 +11,9 @@ import {
 } from '../ui/Icons';
 import { AVAILABLE_SERVICES_DATA, TOP_5_SERVICES_IDS, TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS } from '../../utils';
 import FeaturedCarousel from '../ui/FeaturedCarousel';
-import ServiceCategoryCarousel from './ServiceCategoryCarousel';
-import TopServicesCarousel from './TopServicesCarousel';
-import CategoryTabsCarousel from './CategoryTabsCarousel';
+import ServiceCategoryCarousel from '../ui/ServiceCategoryCarousel';
+import TopServicesCarousel from '../ui/TopServicesCarousel';
+import CategoryTabsCarousel from '../ui/CategoryTabsCarousel';
 import RecommendedGroups from '../layout/RecommendedGroups';
 import { useTheme } from '../../contexts/ThemeContext';
 

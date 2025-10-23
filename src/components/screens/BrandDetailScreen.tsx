@@ -3,7 +3,7 @@ import type { Brand, FeaturedContent } from '../../types';
 import type { ExploreDetailItem } from '../App';
 import { ArrowLeftIcon } from '../ui/Icons';
 import { TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE_URL } from '../../utils';
-import FeaturedCarousel from './FeaturedCarousel';
+import FeaturedCarousel from '../ui/FeaturedCarousel';
 
 interface TMDBContent {
     id: number;

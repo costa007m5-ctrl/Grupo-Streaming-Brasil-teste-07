@@ -6,7 +6,7 @@ import {
     UsersIcon
 } from '../ui/Icons';
 import { AVAILABLE_SERVICES_DATA, TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE_URL, TMDB_NETWORK_IDS, TMDB_GENRE_IDS } from '../../utils';
-import FeaturedCarousel from './FeaturedCarousel';
+import FeaturedCarousel from '../ui/FeaturedCarousel';
 
 const Header: React.FC<{ title: string; onBack: () => void }> = ({ title, onBack }) => (
     <header className="sticky top-0 bg-white/90 backdrop-blur-sm z-10 p-4">

@@ -3,7 +3,7 @@ import type { AvailableService, FeaturedContent, Genre } from '../../types';
 import type { ExploreDetailItem } from '../App';
 import { ArrowLeftIcon, StarIcon } from '../ui/Icons';
 import { TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS } from '../../utils';
-import FeaturedCarousel from './FeaturedCarousel';
+import FeaturedCarousel from '../ui/FeaturedCarousel';
 import ProviderLoadingScreen from './ProviderLoadingScreen';
 import { useTheme } from '../../contexts/ThemeContext';
 
