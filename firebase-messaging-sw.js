@@ -10,13 +10,12 @@ const { CacheableResponsePlugin } = cacheableResponse;
 const { ExpirationPlugin } = expiration;
 const { BackgroundSyncPlugin } = backgroundSync;
 
-const offlineFallbackPage = 'offline.html';
+const offlineFallbackPage = '/offline.html';
 
 // Precache the app shell and offline page.
 precacheAndRoute([
   { url: '/', revision: null },
   { url: '/index.html', revision: null },
-  { url: '/index.tsx', revision: null },
   { url: '/manifest.json', revision: null },
   { url: 'https://img.icons8.com/fluency/192/play-button-circled.png', revision: null },
   { url: offlineFallbackPage, revision: null },
