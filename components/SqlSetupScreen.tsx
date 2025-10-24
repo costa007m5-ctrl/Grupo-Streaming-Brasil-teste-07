@@ -178,6 +178,147 @@ CREATE POLICY "Allow hosts to update their own groups." ON public.groups FOR UPD
 DROP POLICY IF EXISTS "Allow read access to transactions" ON public.transactions;
 CREATE POLICY "Allow read access to transactions" ON public.transactions FOR SELECT TO authenticated USING (auth.uid() = user_id OR auth.uid() = '206cb0fc-ea8b-4823-9aea-bba231edbaf8');
 
+-- 5. NOVA FUNÇÃO RPC PARA BUSCAR GRUPOS PÚBLICOS (Corrige tela Explorar)
+CREATE OR REPLACE FUNCTION public.get_explore_groups()
+RETURNS TABLE (
+  id bigint,
+  created_at timestamptz,
+  name text,
+  price numeric,
+  status text,
+  members smallint,
+  max_members smallint,
+  next_payment_date text,
+  logo text,
+  host_name text,
+  host_id uuid,
+  members_list jsonb,
+  rules jsonb,
+  credentials jsonb,
+  chat_history jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    g.id,
+    g.created_at,
+    g.name,
+    g.price,
+    g.status,
+    g.members,
+    g.max_members,
+    g.next_payment_date,
+    g.logo,
+    g.host_name,
+    g.host_id,
+    g.members_list,
+    g.rules,
+    '{}'::jsonb, -- Retorna um objeto JSON vazio para credentials
+    '[]'::jsonb  -- Retorna um array JSON vazio para chat_history
+  FROM
+    public.groups g;
+END;
+$$;
+
+-- 6. NOVA FUNÇÃO RPC PARA ENTRAR EM GRUPOS (Corrige problema de permissão)
+CREATE OR REPLACE FUNCTION public.join_group(group_id_to_join bigint)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  user_id_to_join uuid;
+  user_profile public.profiles;
+  target_group public.groups;
+  new_member jsonb;
+  new_members_list jsonb;
+BEGIN
+  user_id_to_join := auth.uid();
+  
+  -- Obter perfil do usuário e grupo alvo
+  SELECT * INTO user_profile FROM public.profiles WHERE id = user_id_to_join;
+  SELECT * INTO target_group FROM public.groups WHERE id = group_id_to_join;
+
+  -- Validações
+  IF user_profile IS NULL THEN RAISE EXCEPTION 'Perfil do usuário não encontrado.'; END IF;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+  IF user_profile.balance < target_group.price THEN RAISE EXCEPTION 'Saldo insuficiente.'; END IF;
+  IF target_group.members >= target_group.max_members THEN RAISE EXCEPTION 'O grupo está lotado.'; END IF;
+  IF target_group.members_list @> jsonb_build_array(jsonb_build_object('id', user_id_to_join)) THEN RAISE EXCEPTION 'Você já é membro deste grupo.'; END IF;
+
+  -- Criar novo membro
+  new_member := jsonb_build_object(
+      'id', user_profile.id,
+      'name', user_profile.full_name,
+      'role', 'Membro',
+      'joinDate', to_char(now(), 'Mon YYYY'),
+      'avatarUrl', user_profile.avatar_url
+  );
+
+  -- Atualizar lista de membros e contagem
+  new_members_list := target_group.members_list || new_member;
+
+  -- Executar atualizações
+  -- 1. Debitar do saldo do usuário
+  UPDATE public.profiles
+  SET balance = balance - target_group.price
+  WHERE id = user_id_to_join;
+
+  -- 2. Atualizar o grupo
+  UPDATE public.groups
+  SET members = members + 1,
+      members_list = new_members_list
+  WHERE id = group_id_to_join;
+
+  -- 3. Inserir transação
+  INSERT INTO public.transactions (user_id, amount, type, description, metadata)
+  VALUES (
+    user_id_to_join,
+    -target_group.price,
+    'payment',
+    'Pagamento grupo ' || target_group.name,
+    jsonb_build_object('group_id', group_id_to_join)
+  );
+END;
+$$;
+
+-- 7. NOVA FUNÇÃO RPC PARA ENVIAR MENSAGENS (Corrige problema de permissão)
+CREATE OR REPLACE FUNCTION public.send_group_message(group_id_to_update bigint, new_message jsonb)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  sender_id uuid;
+  target_group public.groups;
+  is_member boolean;
+BEGIN
+  sender_id := auth.uid();
+  
+  -- Obter grupo alvo
+  SELECT * INTO target_group FROM public.groups WHERE id = group_id_to_update;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+
+  -- Verificar se o remetente é membro do grupo
+  SELECT EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(target_group.members_list) as member
+    WHERE member->>'id' = sender_id::text
+  ) INTO is_member;
+  
+  IF NOT is_member THEN RAISE EXCEPTION 'Você não é membro deste grupo e não pode enviar mensagens.'; END IF;
+
+  -- Adicionar a nova mensagem ao histórico
+  UPDATE public.groups
+  SET chat_history = chat_history || new_message
+  WHERE id = group_id_to_update;
+
+END;
+$$;
+
 
 -- FIM DO SCRIPT DE ATUALIZAÇÃO
 `;
@@ -365,6 +506,206 @@ CREATE TRIGGER update_ticket_updated_at
 BEFORE UPDATE ON public.support_tickets
 FOR EACH ROW
 EXECUTE PROCEDURE public.update_ticket_updated_at_column();
+
+-- ADICIONA AS NOVAS FUNÇÕES RPC
+-- 7.1. FUNÇÃO PARA BUSCAR GRUPOS PÚBLICOS
+CREATE OR REPLACE FUNCTION public.get_explore_groups()
+RETURNS TABLE (
+  id bigint, created_at timestamptz, name text, price numeric, status text, members smallint, max_members smallint, next_payment_date text, logo text, host_name text, host_id uuid, members_list jsonb, rules jsonb, credentials jsonb, chat_history jsonb
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  RETURN QUERY SELECT g.id, g.created_at, g.name, g.price, g.status, g.members, g.max_members, g.next_payment_date, g.logo, g.host_name, g.host_id, g.members_list, g.rules, '{}'::jsonb, '[]'::jsonb FROM public.groups g;
+END;
+$$;
+
+-- 7.2. FUNÇÃO PARA ENTRAR EM UM GRUPO
+CREATE OR REPLACE FUNCTION public.join_group(group_id_to_join bigint)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  user_id_to_join uuid; user_profile public.profiles; target_group public.groups; new_member jsonb; new_members_list jsonb;
+BEGIN
+  user_id_to_join := auth.uid();
+  SELECT * INTO user_profile FROM public.profiles WHERE id = user_id_to_join;
+  SELECT * INTO target_group FROM public.groups WHERE id = group_id_to_join;
+  IF user_profile IS NULL THEN RAISE EXCEPTION 'Perfil do usuário não encontrado.'; END IF;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+  IF user_profile.balance < target_group.price THEN RAISE EXCEPTION 'Saldo insuficiente.'; END IF;
+  IF target_group.members >= target_group.max_members THEN RAISE EXCEPTION 'O grupo está lotado.'; END IF;
+  IF target_group.members_list @> jsonb_build_array(jsonb_build_object('id', user_id_to_join)) THEN RAISE EXCEPTION 'Você já é membro deste grupo.'; END IF;
+  new_member := jsonb_build_object('id', user_profile.id, 'name', user_profile.full_name, 'role', 'Membro', 'joinDate', to_char(now(), 'Mon YYYY'), 'avatarUrl', user_profile.avatar_url);
+  new_members_list := target_group.members_list || new_member;
+  UPDATE public.profiles SET balance = balance - target_group.price WHERE id = user_id_to_join;
+  UPDATE public.groups SET members = members + 1, members_list = new_members_list WHERE id = group_id_to_join;
+  INSERT INTO public.transactions (user_id, amount, type, description, metadata) VALUES (user_id_to_join, -target_group.price, 'payment', 'Pagamento grupo ' || target_group.name, jsonb_build_object('group_id', group_id_to_join));
+END;
+$$;
+
+-- 7.3. FUNÇÃO PARA ENVIAR MENSAGEM NO CHAT
+CREATE OR REPLACE FUNCTION public.send_group_message(group_id_to_update bigint, new_message jsonb)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  sender_id uuid; target_group public.groups; is_member boolean;
+BEGIN
+  sender_id := auth.uid();
+  SELECT * INTO target_group FROM public.groups WHERE id = group_id_to_update;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+  SELECT EXISTS (SELECT 1 FROM jsonb_array_elements(target_group.members_list) as member WHERE member->>'id' = sender_id::text) INTO is_member;
+  IF NOT is_member THEN RAISE EXCEPTION 'Você não é membro deste grupo e não pode enviar mensagens.'; END IF;
+  UPDATE public.groups SET chat_history = chat_history || new_message WHERE id = group_id_to_update;
+END;
+$$;
+`;
+
+const ERROR_FIX_SQL = `-- SCRIPT DE CORREÇÃO DE ERROS COMUNS (Funções RPC)
+-- Execute este script se estiver recebendo erros como "Could not find the function..."
+
+-- 1. FUNÇÃO PARA BUSCAR GRUPOS PÚBLICOS (Corrige tela Explorar)
+-- Este script cria/substitui a função que busca os grupos para a tela de exploração,
+-- garantindo que ela exista e não exponha dados sensíveis como credenciais.
+CREATE OR REPLACE FUNCTION public.get_explore_groups()
+RETURNS TABLE (
+  id bigint,
+  created_at timestamptz,
+  name text,
+  price numeric,
+  status text,
+  members smallint,
+  max_members smallint,
+  next_payment_date text,
+  logo text,
+  host_name text,
+  host_id uuid,
+  members_list jsonb,
+  rules jsonb,
+  credentials jsonb,
+  chat_history jsonb
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    g.id,
+    g.created_at,
+    g.name,
+    g.price,
+    g.status,
+    g.members,
+    g.max_members,
+    g.next_payment_date,
+    g.logo,
+    g.host_name,
+    g.host_id,
+    g.members_list,
+    g.rules,
+    '{}'::jsonb, -- Retorna um objeto JSON vazio para credentials
+    '[]'::jsonb  -- Retorna um array JSON vazio para chat_history
+  FROM
+    public.groups g;
+END;
+$$;
+
+-- 2. FUNÇÃO PARA ENTRAR EM GRUPOS (Corrige problema de permissão)
+-- Este script cria/substitui a função que lida com a entrada de um usuário em um grupo.
+-- Usar uma função com "SECURITY DEFINER" permite que a lógica de atualização de saldo
+-- e de grupo seja executada com segurança no servidor, sem expor as políticas de RLS.
+CREATE OR REPLACE FUNCTION public.join_group(group_id_to_join bigint)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  user_id_to_join uuid;
+  user_profile public.profiles;
+  target_group public.groups;
+  new_member jsonb;
+  new_members_list jsonb;
+BEGIN
+  user_id_to_join := auth.uid();
+  
+  -- Obter perfil do usuário e grupo alvo
+  SELECT * INTO user_profile FROM public.profiles WHERE id = user_id_to_join;
+  SELECT * INTO target_group FROM public.groups WHERE id = group_id_to_join;
+
+  -- Validações
+  IF user_profile IS NULL THEN RAISE EXCEPTION 'Perfil do usuário não encontrado.'; END IF;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+  IF user_profile.balance < target_group.price THEN RAISE EXCEPTION 'Saldo insuficiente.'; END IF;
+  IF target_group.members >= target_group.max_members THEN RAISE EXCEPTION 'O grupo está lotado.'; END IF;
+  IF target_group.members_list @> jsonb_build_array(jsonb_build_object('id', user_id_to_join)) THEN RAISE EXCEPTION 'Você já é membro deste grupo.'; END IF;
+
+  -- Criar novo membro
+  new_member := jsonb_build_object(
+      'id', user_profile.id,
+      'name', user_profile.full_name,
+      'role', 'Membro',
+      'joinDate', to_char(now(), 'Mon YYYY'),
+      'avatarUrl', user_profile.avatar_url
+  );
+
+  -- Atualizar lista de membros e contagem
+  new_members_list := target_group.members_list || new_member;
+
+  -- Executar atualizações
+  -- 1. Debitar do saldo do usuário
+  UPDATE public.profiles
+  SET balance = balance - target_group.price
+  WHERE id = user_id_to_join;
+
+  -- 2. Atualizar o grupo
+  UPDATE public.groups
+  SET members = members + 1,
+      members_list = new_members_list
+  WHERE id = group_id_to_join;
+
+  -- 3. Inserir transação
+  INSERT INTO public.transactions (user_id, amount, type, description, metadata)
+  VALUES (
+    user_id_to_join,
+    -target_group.price,
+    'payment',
+    'Pagamento grupo ' || target_group.name,
+    jsonb_build_object('group_id', group_id_to_join)
+  );
+END;
+$$;
+
+-- 3. FUNÇÃO PARA ENVIAR MENSAGENS (Corrige problema de permissão)
+-- Este script cria/substitui a função que permite a um membro enviar uma mensagem
+-- no chat do grupo. A verificação de membro é feita de forma segura no backend.
+CREATE OR REPLACE FUNCTION public.send_group_message(group_id_to_update bigint, new_message jsonb)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  sender_id uuid;
+  target_group public.groups;
+  is_member boolean;
+BEGIN
+  sender_id := auth.uid();
+  
+  -- Obter grupo alvo
+  SELECT * INTO target_group FROM public.groups WHERE id = group_id_to_update;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+
+  -- Verificar se o remetente é membro do grupo
+  SELECT EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(target_group.members_list) as member
+    WHERE member->>'id' = sender_id::text
+  ) INTO is_member;
+  
+  IF NOT is_member THEN RAISE EXCEPTION 'Você não é membro deste grupo e não pode enviar mensagens.'; END IF;
+
+  -- Adicionar a nova mensagem ao histórico
+  UPDATE public.groups
+  SET chat_history = chat_history || new_message
+  WHERE id = group_id_to_update;
+
+END;
+$$;
 `;
 
 const CodeBlock: React.FC<{ title: string; code: string; }> = ({ title, code }) => {
@@ -402,7 +743,7 @@ const CodeBlock: React.FC<{ title: string; code: string; }> = ({ title, code }) 
     );
 };
 
-type Tab = 'inicial' | 'atualizacao' | 'admin';
+type Tab = 'correcao' | 'inicial' | 'atualizacao' | 'admin';
 
 const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => (
     <button
@@ -417,10 +758,12 @@ const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => voi
 
 
 const SqlSetupScreen: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
-    const [activeTab, setActiveTab] = useState<Tab>('inicial');
+    const [activeTab, setActiveTab] = useState<Tab>('correcao');
 
     const renderContent = () => {
         switch(activeTab) {
+            case 'correcao':
+                return <CodeBlock title="Script de Correção de Erros (Funções)" code={ERROR_FIX_SQL} />;
             case 'inicial':
                 return <CodeBlock title="Script de Configuração Inicial (Para Novos Usuários)" code={INITIAL_SETUP_SQL} />;
             case 'atualizacao':
@@ -437,14 +780,15 @@ const SqlSetupScreen: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
             <Header onBack={onBack} />
             <main className="p-4 pt-2 space-y-4">
                  <div className="bg-yellow-50 text-yellow-900 p-4 rounded-xl shadow-sm">
-                    <h3 className="font-bold">Atenção! Erro "permission denied"?</h3>
+                    <h3 className="font-bold">Recebendo erros como "permission denied" ou "Could not find function"?</h3>
                     <p className="text-sm mt-1">
-                        Se você está vendo erros de permissão, seu banco de dados pode estar com regras de segurança (RLS) antigas. Para corrigir, vá para a aba <strong>"Atualização"</strong> e execute o script. Ele é seguro e não apagará seus dados.
+                        Seu banco de dados pode estar desatualizado. A aba <strong>"Correção de Erros"</strong> (selecionada por padrão) resolve os problemas mais comuns de funções ausentes. Para uma atualização completa, use a aba <strong>"Atualização"</strong>.
                     </p>
                 </div>
 
                 <div className="bg-white p-2 rounded-xl shadow-sm">
                     <div className="flex justify-center items-center bg-gray-100 rounded-lg p-1">
+                        <TabButton label="Correção de Erros" isActive={activeTab === 'correcao'} onClick={() => setActiveTab('correcao')} />
                         <TabButton label="Config. Inicial" isActive={activeTab === 'inicial'} onClick={() => setActiveTab('inicial')} />
                         <TabButton label="Atualização" isActive={activeTab === 'atualizacao'} onClick={() => setActiveTab('atualizacao')} />
                         <TabButton label="Admin" isActive={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />
