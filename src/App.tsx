@@ -1,84 +1,91 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { BottomNav, DevMenu, Toast, ThemeSelectionModal, LoadingScreen, NotificationPermissionPrompt, PwaInstallPrompt } from './components';
+import BottomNav from './components/BottomNav';
 import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';
 import { GroupStatus } from './types';
-import { supabase } from './lib';
+import { supabase } from './lib/supabaseClient';
 import type { Session } from '@supabase/gotrue-js';
-import { messaging, requestPermissionAndToken } from './lib';
+import DevMenu from './components/DevMenu';
+import { messaging, requestPermissionAndToken } from './lib/firebase';
 import { onMessage } from 'firebase/messaging';
-import { SoundProvider, ThemeProvider, useTheme } from './contexts';
+import { SoundProvider } from './contexts/SoundContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import ThemeSelectionModal from './components/ThemeSelectionModal';
+import LoadingScreen from './components/LoadingScreen';
+import Toast from './components/Toast';
+import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 
 // Lazy load screen components for code splitting
-const HomeScreen = lazy(() => import('./components/screens/HomeScreen'));
-const ProfileScreen = lazy(() => import('./components/screens/ProfileScreen'));
-const WalletScreen = lazy(() => import('./components/screens/WalletScreen'));
-const ExploreScreen = lazy(() => import('./components/screens/ExploreScreen'));
-const GroupDetailScreen = lazy(() => import('./components/screens/GroupDetailScreen'));
-const PaymentScreen = lazy(() => import('./components/screens/PaymentScreen'));
-const SettingsScreen = lazy(() => import('./components/screens/SettingsScreen'));
-const SupportScreen = lazy(() => import('./components/screens/SupportScreen'));
-const EditProfileScreen = lazy(() => import('./components/screens/EditProfileScreen'));
-const NotificationsScreen = lazy(() => import('./components/screens/NotificationsScreen'));
-const SecurityPrivacyScreen = lazy(() => import('./components/screens/SecurityPrivacyScreen'));
-const MyReviewsScreen = lazy(() => import('./components/screens/MyReviewsScreen'));
-const GroupHistoryScreen = lazy(() => import('./components/screens/GroupHistoryScreen'));
-const ChangePasswordScreen = lazy(() => import('./components/screens/ChangePasswordScreen'));
-const ConnectedDevicesScreen = lazy(() => import('./components/screens/ConnectedDevicesScreen'));
-const TwoFactorAuthScreen = lazy(() => import('./components/screens/TwoFactorAuthScreen'));
-const BiometricsScreen = lazy(() => import('./components/screens/BiometricsScreen'));
-const ProfilePrivacyScreen = lazy(() => import('./components/screens/ProfilePrivacyScreen'));
-const PersonalDataScreen = lazy(() => import('./components/screens/PersonalDataScreen'));
-const ActivityHistoryScreen = lazy(() => import('./components/screens/ActivityHistoryScreen'));
-const AccountVerificationScreen = lazy(() => import('./components/screens/AccountVerificationScreen'));
-const PersonalInfoScreen = lazy(() => import('./components/screens/PersonalInfoScreen'));
-const AddressScreen = lazy(() => import('./components/screens/AddressScreen'));
-const DocumentUploadScreen = lazy(() => import('./components/screens/DocumentUploadScreen'));
-const SelfieScreen = lazy(() => import('./components/screens/SelfieScreen'));
-const PhoneVerificationScreen = lazy(() => import('./components/screens/PhoneVerificationScreen'));
-const AddMoneyScreen = lazy(() => import('./components/screens/AddMoneyScreen'));
-const TransferScreen = lazy(() => import('./components/screens/TransferScreen'));
-const TransferConfirmScreen = lazy(() => import('./components/screens/TransferConfirmScreen'));
-const StatementScreen = lazy(() => import('./components/screens/StatementScreen'));
-const WithdrawScreen = lazy(() => import('./components/screens/WithdrawScreen'));
-const AddAmountScreen = lazy(() => import('./components/screens/AddAmountScreen'));
-const CreateGroupScreen = lazy(() => import('./components/screens/CreateGroupScreen'));
-const ConfigureGroupScreen = lazy(() => import('./components/screens/ConfigureGroupScreen'));
-const GroupCredentialsScreen = lazy(() => import('./components/screens/GroupCredentialsScreen'));
-const GroupChatScreen = lazy(() => import('./components/screens/GroupChatScreen'));
-const MyGroupDetailScreen = lazy(() => import('./components/screens/MyGroupDetailScreen'));
-const WelcomeScreen = lazy(() => import('./components/screens/WelcomeScreen'));
-const LoginScreen = lazy(() => import('./components/screens/LoginScreen'));
-const SignUpScreen = lazy(() => import('./components/screens/SignUpScreen'));
-const ForgotPasswordScreen = lazy(() => import('./components/screens/ForgotPasswordScreen'));
-const UpdatePasswordScreen = lazy(() => import('./components/screens/UpdatePasswordScreen'));
-const SqlSetupScreen = lazy(() => import('./components/screens/SqlSetupScreen'));
-const PaymentSetupScreen = lazy(() => import('./components/screens/PaymentSetupScreen'));
-const EnterPhoneNumberScreen = lazy(() => import('./components/screens/EnterPhoneNumberScreen'));
-const ChangeAvatarScreen = lazy(() => import('./components/screens/ChangeAvatarScreen'));
-const TransferSuccessScreen = lazy(() => import('./components/screens/TransferSuccessScreen'));
-const StatementDetailScreen = lazy(() => import('./components/screens/StatementDetailScreen'));
-const ServiceDetailScreen = lazy(() => import('./components/screens/ServiceDetailScreen'));
-const MovieDetailScreen = lazy(() => import('./components/screens/MovieDetailScreen'));
-const MoviesScreen = lazy(() => import('./components/screens/MoviesScreen'));
-const ProviderDetailScreen = lazy(() => import('./components/screens/ProviderDetailScreen'));
-const NetflixIntro = lazy(() => import('./components/screens/NetflixIntro'));
-const DisneyPlusIntro = lazy(() => import('./components/screens/DisneyPlusIntro'));
-const PrimeVideoIntro = lazy(() => import('./components/screens/PrimeVideoIntro'));
-const MaxIntro = lazy(() => import('./components/screens/MaxIntro'));
-const SoundSettingsScreen = lazy(() => import('./components/screens/SoundSettingsScreen'));
-const NetflixScreen = lazy(() => import('./components/screens/NetflixScreen'));
-const NetflixDetailScreen = lazy(() => import('./components/screens/NetflixDetailScreen'));
-const DisneyPlusScreen = lazy(() => import('./components/screens/DisneyPlusScreen'));
-const DisneyPlusDetailScreen = lazy(() => import('./components/screens/DisneyPlusDetailScreen'));
-const PrimeVideoScreen = lazy(() => import('./components/screens/PrimeVideoScreen'));
-const PrimeVideoDetailScreen = lazy(() => import('./components/screens/PrimeVideoDetailScreen'));
-const MaxScreen = lazy(() => import('./components/screens/MaxScreen'));
-const MaxDetailScreen = lazy(() => import('./components/screens/MaxDetailScreen'));
-const BrandDetailScreen = lazy(() => import('./components/screens/BrandDetailScreen'));
-const AdminScreen = lazy(() => import('./components/screens/AdminScreen'));
-const TermsOfUseScreen = lazy(() => import('./components/screens/TermsOfUseScreen'));
-const DesignSettingsScreen = lazy(() => import('./components/screens/DesignSettingsScreen'));
+const HomeScreen = lazy(() => import('./components/HomeScreen'));
+const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
+const WalletScreen = lazy(() => import('./components/WalletScreen'));
+const ExploreScreen = lazy(() => import('./components/ExploreScreen'));
+const GroupDetailScreen = lazy(() => import('./components/GroupDetailScreen'));
+const PaymentScreen = lazy(() => import('./components/PaymentScreen'));
+const SettingsScreen = lazy(() => import('./components/SettingsScreen'));
+const SupportScreen = lazy(() => import('./components/SupportScreen'));
+const EditProfileScreen = lazy(() => import('./components/EditProfileScreen'));
+const NotificationsScreen = lazy(() => import('./components/NotificationsScreen'));
+const SecurityPrivacyScreen = lazy(() => import('./components/SecurityPrivacyScreen'));
+const MyReviewsScreen = lazy(() => import('./components/MyReviewsScreen'));
+const GroupHistoryScreen = lazy(() => import('./components/GroupHistoryScreen'));
+const ChangePasswordScreen = lazy(() => import('./components/ChangePasswordScreen'));
+const ConnectedDevicesScreen = lazy(() => import('./components/ConnectedDevicesScreen'));
+const TwoFactorAuthScreen = lazy(() => import('./components/TwoFactorAuthScreen'));
+const BiometricsScreen = lazy(() => import('./components/BiometricsScreen'));
+const ProfilePrivacyScreen = lazy(() => import('./components/ProfilePrivacyScreen'));
+const PersonalDataScreen = lazy(() => import('./components/PersonalDataScreen'));
+const ActivityHistoryScreen = lazy(() => import('./components/ActivityHistoryScreen'));
+const AccountVerificationScreen = lazy(() => import('./components/AccountVerificationScreen'));
+const PersonalInfoScreen = lazy(() => import('./components/PersonalInfoScreen'));
+const AddressScreen = lazy(() => import('./components/AddressScreen'));
+const DocumentUploadScreen = lazy(() => import('./components/DocumentUploadScreen'));
+const SelfieScreen = lazy(() => import('./components/SelfieScreen'));
+const PhoneVerificationScreen = lazy(() => import('./components/PhoneVerificationScreen'));
+const AddMoneyScreen = lazy(() => import('./components/AddMoneyScreen'));
+const TransferScreen = lazy(() => import('./components/TransferScreen'));
+const TransferConfirmScreen = lazy(() => import('./components/TransferConfirmScreen'));
+const StatementScreen = lazy(() => import('./components/StatementScreen'));
+const WithdrawScreen = lazy(() => import('./components/WithdrawScreen'));
+const AddAmountScreen = lazy(() => import('./components/AddAmountScreen'));
+const CreateGroupScreen = lazy(() => import('./components/CreateGroupScreen'));
+const ConfigureGroupScreen = lazy(() => import('./components/ConfigureGroupScreen'));
+const GroupCredentialsScreen = lazy(() => import('./components/GroupCredentialsScreen'));
+const GroupChatScreen = lazy(() => import('./components/GroupChatScreen'));
+const MyGroupDetailScreen = lazy(() => import('./components/MyGroupDetailScreen'));
+const WelcomeScreen = lazy(() => import('./components/WelcomeScreen'));
+const LoginScreen = lazy(() => import('./components/LoginScreen'));
+const SignUpScreen = lazy(() => import('./components/SignUpScreen'));
+const ForgotPasswordScreen = lazy(() => import('./components/ForgotPasswordScreen'));
+const UpdatePasswordScreen = lazy(() => import('./components/UpdatePasswordScreen'));
+const SqlSetupScreen = lazy(() => import('./components/SqlSetupScreen'));
+const PaymentSetupScreen = lazy(() => import('./components/PaymentSetupScreen'));
+const EnterPhoneNumberScreen = lazy(() => import('./components/EnterPhoneNumberScreen'));
+const ChangeAvatarScreen = lazy(() => import('./components/ChangeAvatarScreen'));
+const TransferSuccessScreen = lazy(() => import('./components/TransferSuccessScreen'));
+const StatementDetailScreen = lazy(() => import('./components/StatementDetailScreen'));
+const ServiceDetailScreen = lazy(() => import('./components/ServiceDetailScreen'));
+const MovieDetailScreen = lazy(() => import('./components/MovieDetailScreen'));
+const MoviesScreen = lazy(() => import('./components/MoviesScreen'));
+const ProviderDetailScreen = lazy(() => import('./components/ProviderDetailScreen'));
+const NetflixIntro = lazy(() => import('./components/NetflixIntro'));
+const DisneyPlusIntro = lazy(() => import('./components/DisneyPlusIntro'));
+const PrimeVideoIntro = lazy(() => import('./components/PrimeVideoIntro'));
+const MaxIntro = lazy(() => import('./components/MaxIntro'));
+const SoundSettingsScreen = lazy(() => import('./components/SoundSettingsScreen'));
+const NetflixScreen = lazy(() => import('./components/NetflixScreen'));
+const NetflixDetailScreen = lazy(() => import('./components/NetflixDetailScreen'));
+const DisneyPlusScreen = lazy(() => import('./components/DisneyPlusScreen'));
+const DisneyPlusDetailScreen = lazy(() => import('./components/DisneyPlusDetailScreen'));
+const PrimeVideoScreen = lazy(() => import('./components/PrimeVideoScreen'));
+const PrimeVideoDetailScreen = lazy(() => import('./components/PrimeVideoDetailScreen'));
+const MaxScreen = lazy(() => import('./components/MaxScreen'));
+const MaxDetailScreen = lazy(() => import('./components/MaxDetailScreen'));
+const BrandDetailScreen = lazy(() => import('./components/BrandDetailScreen'));
+const AdminScreen = lazy(() => import('./components/AdminScreen'));
+const TermsOfUseScreen = lazy(() => import('./components/TermsOfUseScreen'));
+const DesignSettingsScreen = lazy(() => import('./components/DesignSettingsScreen'));
 
 
 interface TMDBMovie {
@@ -307,22 +314,10 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      console.warn('Session loading timed out, proceeding anyway');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
       setLoading(false);
-    }, 5000);
-    
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        clearTimeout(timeoutId);
-        setSession(session);
-        setLoading(false);
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId);
-        console.error('Error getting session:', error);
-        setLoading(false);
-      });
+    });
 
     const {
       data: { subscription },
@@ -340,10 +335,7 @@ const AppContent: React.FC = () => {
         }
     });
 
-    return () => {
-      clearTimeout(timeoutId);
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchUserData = async () => {
@@ -836,7 +828,7 @@ const AppContent: React.FC = () => {
             setSelectedExploreItem(null);
             setSelectedMovie(null);
             try {
-                const { TMDB_BASE_URL, TMDB_API_KEY, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS, AVAILABLE_SERVICES_DATA } = await import('./utils');
+                const { TMDB_BASE_URL, TMDB_API_KEY, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS, AVAILABLE_SERVICES_DATA } = await import('./constants');
                 const response = await fetch(`${TMDB_BASE_URL}/movie/${item.id}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=watch/providers`);
                 if (!response.ok) throw new Error("Filme não encontrado.");
                 const data = await response.json();
@@ -897,7 +889,7 @@ const AppContent: React.FC = () => {
             };
 
             if (item.type === 'service') {
-                const { AVAILABLE_SERVICES_DATA } = await import('./utils');
+                const { AVAILABLE_SERVICES_DATA } = await import('./constants');
                 const service = AVAILABLE_SERVICES_DATA.find(s => s.id === item.id);
                 if (service) {
                     const serviceId = service.id.toLowerCase();
@@ -929,7 +921,7 @@ const AppContent: React.FC = () => {
 
         setLoading(true);
         try {
-                const { TMDB_BASE_URL, TMDB_API_KEY } = await import('./utils');
+            const { TMDB_BASE_URL, TMDB_API_KEY } = await import('./constants');
             const response = await fetch(`${TMDB_BASE_URL}/movie/${item.id}?api_key=${TMDB_API_KEY}&language=pt-BR`);
             if (!response.ok) throw new Error("Filme não encontrado.");
             const data = await response.json();

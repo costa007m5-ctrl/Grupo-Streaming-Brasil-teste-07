@@ -17,7 +17,7 @@ precacheAndRoute([
   { url: '/', revision: null },
   { url: '/index.html', revision: null },
   { url: '/manifest.json', revision: null },
-  { url: '/icon-192.png', revision: null },
+  { url: 'https://img.icons8.com/fluency/192/play-button-circled.png', revision: null },
   { url: offlineFallbackPage, revision: null },
 ]);
 
@@ -148,73 +148,24 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: payload.notification.icon || '/icon-192.png',
-    badge: payload.notification.badge || '/icon-192.png',
-    image: payload.notification.image,
-    data: payload.data || {},
-    actions: payload.notification.actions || [],
-    requireInteraction: payload.notification.requireInteraction || false
+    icon: payload.notification.icon || 'https://img.icons8.com/fluency/192/play-button-circled.png'
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Handler para cliques em notificações
 self.addEventListener('notificationclick', (event) => {
-    const notification = event.notification;
-    const action = event.action;
-    const data = notification.data || {};
-
-    console.log('Notificação clicada:', { action, data });
-
-    // Fecha a notificação
-    notification.close();
-
-    // Ações específicas baseadas no tipo
-    if (action === 'close') {
-        return; // Apenas fecha
-    }
-
-    // Abre ou foca a janela do app
+    event.notification.close();
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Define a URL baseada na ação
-            let targetUrl = '/';
-            
-            if (action === 'view' || action === 'view-group') {
-                targetUrl = '/?view=explore';
-            } else if (action === 'pay-now') {
-                targetUrl = '/?view=wallet';
-            } else if (action === 'reply' || action === 'send-message') {
-                targetUrl = '/?view=explore&action=chat';
-            } else if (action === 'view-promo') {
-                targetUrl = '/?view=home';
-            } else if (action === 'watch' || action === 'save') {
-                targetUrl = '/?view=movies';
-            }
-
-            // Tenta focar em uma janela existente
-            for (let i = 0; i < clientList.length; i++) {
-                const client = clientList[i];
-                if (client.url.includes(self.location.origin)) {
-                    return client.focus().then(client => {
-                        if (client.url !== client.url.split('?')[0] + targetUrl.split('?')[1]) {
-                            return client.navigate(targetUrl);
-                        }
-                        return client;
-                    });
+            if (clientList.length > 0) {
+                let client = clientList[0];
+                for (let i = 0; i < clientList.length; i++) {
+                    if (clientList[i].focused) client = clientList[i];
                 }
+                return client.focus();
             }
-            
-            // Se não houver janela aberta, abre uma nova
-            if (clients.openWindow) {
-                return clients.openWindow(targetUrl);
-            }
+            return clients.openWindow('/');
         })
     );
-});
-
-// Handler para quando a notificação é fechada
-self.addEventListener('notificationclose', (event) => {
-    console.log('Notificação fechada:', event.notification.data);
 });
