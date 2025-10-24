@@ -146,10 +146,32 @@ const messaging = firebase.messaging();
 // Push Notification Handlers
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification.title;
+  
+  // Prefer data payload for more control, fallback to notification payload
+  const notificationData = payload.data || payload.notification || {};
+  
+  const notificationTitle = notificationData.title || 'Grupo Streaming Brasil';
   const notificationOptions = {
-    body: payload.notification.body,
-    icon: payload.notification.icon || 'https://img.icons8.com/fluency/192/play-button-circled.png'
+    body: notificationData.body,
+    // Icon: a small icon for the notification. This is what shows up in the status bar.
+    icon: 'https://img.icons8.com/fluency/192/play-button-circled.png',
+    // Badge: a monochrome icon for Android devices.
+    badge: 'https://img.icons8.com/fluency/192/play-button-circled.png',
+    // Image: A larger image to display within the notification.
+    image: notificationData.image, // Assumes server might send an image
+    // Vibrate: A vibration pattern.
+    vibrate: [200, 100, 200],
+    // Tag: An ID for the notification. Notifications with the same tag will replace each other.
+    tag: 'gsb-notification',
+    // Actions: Buttons for users to interact with.
+    actions: [
+      { action: 'explore', title: 'Explorar Grupos' },
+      { action: 'open', title: 'Abrir App' }
+    ],
+    // Data to pass to the notificationclick event
+    data: {
+        url: notificationData.url || '/' // Default to opening the app's root
+    }
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
@@ -157,16 +179,42 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            if (clientList.length > 0) {
-                let client = clientList[0];
-                for (let i = 0; i < clientList.length; i++) {
-                    if (clientList[i].focused) client = clientList[i];
-                }
-                return client.focus();
+    
+    // Default URL is from notification data, or root
+    let openUrl = event.notification.data.url || '/';
+
+    // Check which action was clicked
+    if (event.action === 'explore') {
+        openUrl = '/?view=explore';
+    } else if (event.action === 'open') {
+        openUrl = '/';
+    }
+
+    const urlToOpen = new URL(openUrl, self.location.origin).href;
+
+    const promiseChain = clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+    }).then((windowClients) => {
+        let matchingClient = null;
+        for (let i = 0; i < windowClients.length; i++) {
+            const windowClient = windowClients[i];
+            // Check if a client for the base URL is already open
+            if (new URL(windowClient.url).origin === self.location.origin) {
+                matchingClient = windowClient;
+                break;
             }
-            return clients.openWindow('/');
-        })
-    );
+        }
+
+        if (matchingClient) {
+            // If a window is already open, navigate it to the target URL and focus it
+            matchingClient.navigate(urlToOpen);
+            return matchingClient.focus();
+        } else {
+            // Otherwise, open a new window
+            return clients.openWindow(urlToOpen);
+        }
+    });
+
+    event.waitUntil(promiseChain);
 });
