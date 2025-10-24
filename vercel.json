@@ -1,8 +1,8 @@
 {
-  "note": "This file is for Vercel deployments and is not used by Render. For this SPA to work correctly on Render, you must configure a rewrite rule in your Static Site settings.",
-  "render_rewrite_instructions": {
-    "source": "/*",
-    "destination": "/index.html",
-    "action": "Rewrite"
-  }
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
