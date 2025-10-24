@@ -34,6 +34,8 @@ export interface Profile {
   state?: string;
   created_at?: string;
   fcm_tokens?: string[];
+  is_profile_private?: boolean;
+  is_searchable?: boolean;
 }
 
 export interface Group {
@@ -54,7 +56,6 @@ export interface Group {
     password?: string;
   };
   host_id?: string;
-  created_at?: string;
 }
 
 export interface Activity {

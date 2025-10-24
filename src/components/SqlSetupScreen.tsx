@@ -30,6 +30,9 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS neighborhood text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS city text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS state text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS fcm_tokens text[];
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_profile_private boolean DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_searchable boolean DEFAULT true;
+
 
 -- 2. CRIAR TABELA DE TICKETS DE SUPORTE (SE NÃO EXISTIR)
 CREATE TABLE IF NOT EXISTS public.support_tickets (
@@ -364,7 +367,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   neighborhood text,
   city text,
   state text,
-  fcm_tokens text[]
+  fcm_tokens text[],
+  is_profile_private boolean DEFAULT false,
+  is_searchable boolean DEFAULT true
 );
 COMMENT ON TABLE public.profiles IS 'Armazena informações públicas do perfil de cada usuário.';
 
