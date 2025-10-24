@@ -17,6 +17,7 @@ import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 
 // Lazy load screen components for code splitting
+const AllMyGroupsScreen = lazy(() => import('./components/AllMyGroupsScreen'));
 const HomeScreen = lazy(() => import('./components/HomeScreen'));
 const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
 const WalletScreen = lazy(() => import('./components/WalletScreen'));
@@ -153,6 +154,7 @@ const AppContent: React.FC = () => {
   
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [exploreGroups, setExploreGroups] = useState<Group[]>([]);
+  const [viewingAllMyGroups, setViewingAllMyGroups] = useState(false);
 
   // Service clone states
   const [viewingNetflix, setViewingNetflix] = useState(false);
@@ -503,6 +505,7 @@ const AppContent: React.FC = () => {
     setSelectedExploreItem(null);
     setSelectedMovie(null);
     setSelectedProvider(null);
+    setViewingAllMyGroups(false);
     setViewingNetflix(false);
     setSelectedNetflixItem(null);
     setViewingDisneyPlus(false);
@@ -1267,6 +1270,23 @@ const AppContent: React.FC = () => {
     if (!session) {
         return renderAuthContent();
     }
+    
+    if (selectedMyGroup) {
+      return <MyGroupDetailScreen group={selectedMyGroup} onBack={handleBackFromMyGroupDetails} onGoToChat={handleViewGroupChat} />;
+    }
+    
+    if (activeChatGroup) {
+      return <GroupChatScreen group={activeChatGroup} onBack={() => setActiveChatGroup(null)} profile={profile} onSendMessage={handleSendMessage} />;
+    }
+
+    if (viewingAllMyGroups) {
+      return <AllMyGroupsScreen
+        groups={myGroups}
+        onBack={() => setViewingAllMyGroups(false)}
+        onViewGroupChat={handleViewGroupChat}
+        onViewMyGroupDetails={handleViewMyGroupDetails}
+      />;
+    }
 
     if (selectedMovie) {
         return <MovieDetailScreen
@@ -1289,14 +1309,6 @@ const AppContent: React.FC = () => {
             onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })} 
             onSelectSeries={(seriesId) => alert(`Detalhes para a série ID ${seriesId} serão adicionados em breve!`)}
         />
-    }
-    
-    if (selectedMyGroup) {
-      return <MyGroupDetailScreen group={selectedMyGroup} onBack={handleBackFromMyGroupDetails} onGoToChat={handleViewGroupChat} />;
-    }
-    
-    if (activeChatGroup) {
-      return <GroupChatScreen group={activeChatGroup} onBack={() => setActiveChatGroup(null)} profile={profile} onSendMessage={handleSendMessage} />;
     }
     
     if (isInPaymentFlow && selectedGroup) {
@@ -1578,12 +1590,13 @@ const AppContent: React.FC = () => {
             onEnterAdminMode={handleEnterAdminMode}
             notificationCount={unreadCount}
             onNotificationClick={handleNotificationClick}
+            onViewAllGroups={() => setViewingAllMyGroups(true)}
         />;
     }
   };
   
   const isIntroPlaying = !!introState;
-  const isNavHidden = isThemeModalOpen || isAdminView || isIntroPlaying || !session || !!activeDevScreen || !!selectedGroup || isInPaymentFlow || profileView !== 'main' || walletView !== 'main' || exploreView !== 'main' || !!activeChatGroup || !!selectedMyGroup || !!selectedExploreItem || !!selectedMovie || !!selectedProvider || viewingNetflix || viewingDisneyPlus || viewingPrimeVideo || viewingMax || !!selectedBrand;
+  const isNavHidden = isThemeModalOpen || isAdminView || isIntroPlaying || !session || !!activeDevScreen || !!selectedGroup || isInPaymentFlow || profileView !== 'main' || walletView !== 'main' || exploreView !== 'main' || !!activeChatGroup || !!selectedMyGroup || !!selectedExploreItem || !!selectedMovie || !!selectedProvider || viewingNetflix || viewingDisneyPlus || viewingPrimeVideo || viewingMax || !!selectedBrand || viewingAllMyGroups;
 
   return (
     <div onClick={unlockAudio} className={`font-sans max-w-md mx-auto min-h-screen ${theme === 'dark' ? 'dark' : ''}`}>

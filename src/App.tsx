@@ -17,6 +17,7 @@ import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 
 // Lazy load screen components for code splitting
+const AllMyGroupsScreen = lazy(() => import('./components/AllMyGroupsScreen'));
 const HomeScreen = lazy(() => import('./components/HomeScreen'));
 const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
 const WalletScreen = lazy(() => import('./components/WalletScreen'));
@@ -153,6 +154,7 @@ const AppContent: React.FC = () => {
   
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [exploreGroups, setExploreGroups] = useState<Group[]>([]);
+  const [viewingAllMyGroups, setViewingAllMyGroups] = useState(false);
 
   // Service clone states
   const [viewingNetflix, setViewingNetflix] = useState(false);
@@ -166,7 +168,7 @@ const AppContent: React.FC = () => {
   const [selectedMaxItem, setSelectedMaxItem] = useState<ContentItem | null>(null);
 
   // Notifications
-  const [notification, setNotification] = useState<{title: string, body: string, onClick?: () => void} | null>(null);
+  const [notification, setNotification] = useState<{title: string, body: string} | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
@@ -374,24 +376,16 @@ const AppContent: React.FC = () => {
 
       setProfile(profileData as Profile);
 
-      // Fetch all public group data for the Explore screen
-      const { data: exploreGroupsData, error: exploreGroupsError } = await supabase
-        .rpc('get_explore_groups');
-      
-      if (exploreGroupsError) throw exploreGroupsError;
-      if (exploreGroupsData) {
-        setExploreGroups(exploreGroupsData as Group[]);
-      }
-
-      // Fetch the user's groups with full data (credentials, chat) using RLS
-      const { data: myGroupsData, error: myGroupsError } = await supabase
+      const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
         .select('*')
         .order('id', { ascending: false });
 
-      if (myGroupsError) throw myGroupsError;
-      if (myGroupsData) {
-        setMyGroups(myGroupsData as Group[]);
+      if (groupsError) throw groupsError;
+      if (groupsData) {
+        const allGroups = groupsData as Group[];
+        setExploreGroups(allGroups);
+        setMyGroups(allGroups);
       }
     } catch (error) {
       const typedError = error as { message: string };
@@ -412,49 +406,19 @@ const AppContent: React.FC = () => {
     }
   }, [session]);
 
-  const getAndSavePushToken = async () => {
-    if (!profile) return;
-
-    const token = await requestPermissionAndToken();
-    if (token) {
-      try {
-        const { data: currentProfile, error: profileError } = await supabase
-          .from('profiles')
-          .select('fcm_tokens')
-          .eq('id', profile.id)
-          .single();
-
-        if (profileError) throw profileError;
-
-        const currentTokens = currentProfile?.fcm_tokens || [];
-        if (!currentTokens.includes(token)) {
-          const newTokens = [...new Set([...currentTokens, token])];
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ fcm_tokens: newTokens })
-            .eq('id', profile.id);
-
-          if (updateError) throw updateError;
-          console.log("✅ Token FCM salvo no perfil.");
-        } else {
-          console.log("ℹ️ Token FCM já existe no perfil.");
-        }
-      } catch (error) {
-        console.error("Erro ao salvar token FCM:", error);
-      }
-    }
-  };
-
   // Setup notifications
   useEffect(() => {
-    if (!session || !profile) {
+    if (!session) {
         return;
     }
     
     if ('Notification' in window) {
         if (Notification.permission === 'granted') {
-            getAndSavePushToken();
+            // If permission is already granted, we can get the token.
+            // requestPermissionAndToken will handle this without showing a prompt.
+            requestPermissionAndToken();
         } else if (Notification.permission === 'default') {
+             // If permission is not yet asked, we show our custom prompt.
              const hasDismissed = sessionStorage.getItem('notification_prompt_dismissed');
              if (!hasDismissed) {
                  setShowNotificationPrompt(true);
@@ -466,23 +430,9 @@ const AppContent: React.FC = () => {
     const unsubscribe = onMessage(messaging, (payload) => {
         console.log('Mensagem recebida em primeiro plano. ', payload);
         if (payload.notification) {
-            let clickHandler = () => handleNotificationClick(); // Default handler
-
-            if (payload.data?.type === 'chat_message' && payload.data?.groupId) {
-                const groupId = parseInt(payload.data.groupId, 10);
-                const targetGroup = exploreGroups.find(g => g.id === groupId); 
-                if (targetGroup) {
-                    // If a chat message, create a specific handler to open the chat
-                    clickHandler = () => {
-                        setActiveChatGroup(targetGroup);
-                    };
-                }
-            }
-
             setNotification({
                 title: payload.notification.title || 'Nova Notificação',
-                body: payload.notification.body || '',
-                onClick: clickHandler
+                body: payload.notification.body || ''
             });
             setNotifications(prev => [payload.notification, ...prev]);
             setUnreadCount(prev => prev + 1);
@@ -492,42 +442,7 @@ const AppContent: React.FC = () => {
     return () => {
         unsubscribe();
     };
-  }, [session, profile, myGroups, exploreGroups]);
-
-  // Handle deep linking from URL
-  useEffect(() => {
-    const handleDeepLink = async () => {
-        const params = new URLSearchParams(window.location.search);
-        const chatGroupId = params.get('chatGroupId');
-
-        if (chatGroupId && session) {
-            const groupId = parseInt(chatGroupId, 10);
-            if (!isNaN(groupId)) {
-                const existingGroup = exploreGroups.find(g => g.id === groupId);
-                if (existingGroup) {
-                    setActiveChatGroup(existingGroup);
-                } else {
-                    setLoading(true);
-                    const { data: group, error } = await supabase
-                        .from('groups')
-                        .select('*')
-                        .eq('id', groupId)
-                        .maybeSingle();
-                    setLoading(false);
-                    
-                    if (error) console.error('Error fetching group for deep link:', error);
-                    else if (group) setActiveChatGroup(group);
-                }
-            }
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-    };
-
-    if(session && (exploreGroups.length > 0 || myGroups.length > 0)) {
-         handleDeepLink();
-    }
-}, [session, exploreGroups, myGroups]);
+  }, [session]);
 
   // Setup Periodic Background Sync
   useEffect(() => {
@@ -565,8 +480,7 @@ const AppContent: React.FC = () => {
 
   const handleAllowNotifications = async () => {
       setShowNotificationPrompt(false);
-      sessionStorage.setItem('notification_prompt_dismissed', 'true');
-      await getAndSavePushToken();
+      await requestPermissionAndToken();
   };
 
   const handleDismissNotificationPrompt = () => {
@@ -580,45 +494,6 @@ const AppContent: React.FC = () => {
     setUnreadCount(0);
   };
 
-  const handleTestNotification = async () => {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-        alert('Este navegador não suporta notificações.');
-        return;
-    }
-
-    if (Notification.permission === 'granted') {
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            const notificationTitle = 'Exemplo de Notificação ✨';
-            const notificationOptions = {
-                body: 'É assim que as notificações ricas aparecerão no seu dispositivo!',
-                icon: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-                badge: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-                image: 'https://i.ibb.co/h1WqNfN/screenshot-narrow-2.png',
-                vibrate: [200, 100, 200],
-                tag: 'gsb-test-notification',
-                actions: [
-                  { action: 'explore', title: 'Explorar Grupos' },
-                  { action: 'open', title: 'Abrir App' }
-                ],
-                data: {
-                    url: '/?view=explore'
-                }
-            };
-            await registration.showNotification(notificationTitle, notificationOptions);
-            alert("Notificação de teste enviada!");
-        } catch (error) {
-            console.error("Erro ao mostrar notificação de teste:", error);
-            alert("Falha ao exibir a notificação de teste.");
-        }
-    } else if (Notification.permission === 'default') {
-        alert('Por favor, permita as notificações primeiro.');
-        handleAllowNotifications();
-    } else {
-        alert('As notificações estão bloqueadas. Habilite-as nas configurações do seu navegador para este site.');
-    }
-};
-
   useEffect(() => {
     setProfileView('main');
     setWalletView('main');
@@ -630,6 +505,7 @@ const AppContent: React.FC = () => {
     setSelectedExploreItem(null);
     setSelectedMovie(null);
     setSelectedProvider(null);
+    setViewingAllMyGroups(false);
     setViewingNetflix(false);
     setSelectedNetflixItem(null);
     setViewingDisneyPlus(false);
@@ -914,24 +790,48 @@ const AppContent: React.FC = () => {
 
     const handleJoinGroup = async (groupToJoin: Group) => {
         if (!profile) { alert("Você precisa estar logado para entrar em um grupo."); return; }
+        if (profile.balance < groupToJoin.price) { alert("Saldo insuficiente."); return; }
+        if (groupToJoin.members_list.some(m => m.id === profile.id)) { alert("Você já está neste grupo."); return; }
+        if (groupToJoin.members >= groupToJoin.max_members) { alert("Grupo está lotado."); return; }
+
+        const newMember: GroupMember = {
+            id: profile.id,
+            name: profile.full_name,
+            role: 'Membro' as const,
+            joinDate: new Date().toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', ''),
+            avatarUrl: profile.avatar_url
+        };
         
-        try {
-            const { error } = await supabase.rpc('join_group', {
-                group_id_to_join: groupToJoin.id
+        const newMembersList = [...groupToJoin.members_list, newMember];
+        const newMemberCount = groupToJoin.members + 1;
+        const newBalance = profile.balance - groupToJoin.price;
+
+        const { error: transactionInsertError } = await supabase
+            .from('transactions')
+            .insert({
+                user_id: profile.id,
+                amount: -groupToJoin.price,
+                type: 'payment',
+                description: `Pagamento grupo ${groupToJoin.name}`,
+                metadata: { group_id: groupToJoin.id }
             });
 
-            if (error) {
-                throw error;
-            }
+        const { error: groupUpdateError } = await supabase.from('groups').update({
+            members: newMemberCount,
+            members_list: newMembersList
+        }).eq('id', groupToJoin.id);
 
+        const { error: profileUpdateError } = await supabase.from('profiles').update({
+            balance: newBalance
+        }).eq('id', profile.id);
+
+        if (groupUpdateError || profileUpdateError || transactionInsertError) {
+            alert("Erro ao entrar no grupo. Se o valor foi debitado, contate o suporte.");
+        } else {
             alert("Você entrou no grupo com sucesso!");
-            fetchUserData(); // Refetch data to update UI
+            fetchUserData();
             setIsInPaymentFlow(false);
             setSelectedGroup(null);
-
-        } catch (error: any) {
-            console.error("Erro ao entrar no grupo:", error);
-            alert(`Erro ao entrar no grupo: ${error.message}`);
         }
     };
     
@@ -1125,34 +1025,22 @@ const AppContent: React.FC = () => {
   };
 
   const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
-    // Optimistic UI Update
     const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
     if (!targetGroup) return;
 
     const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
-    const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
-    
-    setMyGroups(prev => updateGroupState(prev));
-    setExploreGroups(prev => updateGroupState(prev));
-    if (activeChatGroup?.id === groupId) {
-        setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
-    }
-    
-    // Call the RPC function to persist the message
-    try {
-        const { error } = await supabase.rpc('send_group_message', {
-            group_id_to_update: groupId,
-            new_message: newMessage
-        });
 
-        if (error) {
-            throw error;
-        }
-    } catch (error: any) {
-        console.error('Falha ao enviar mensagem:', error);
+    const { error } = await supabase.from('groups').update({ chat_history: updatedChatHistory }).eq('id', groupId);
+
+    if (error) {
         alert('Falha ao enviar mensagem: ' + error.message);
-        // Revert optimistic update on error by refetching data
-        fetchUserData();
+    } else {
+        const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
+        setMyGroups(prev => updateGroupState(prev));
+        setExploreGroups(prev => updateGroupState(prev));
+        if (activeChatGroup?.id === groupId) {
+            setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
+        }
     }
   };
 
@@ -1369,7 +1257,6 @@ const AppContent: React.FC = () => {
             onBack={() => setIsAdminView(false)} 
             onInstallApp={handleInstallClick}
             showInstallButton={!!deferredInstallPrompt}
-            onTestNotification={handleTestNotification}
         />;
     }
     
@@ -1382,6 +1269,23 @@ const AppContent: React.FC = () => {
 
     if (!session) {
         return renderAuthContent();
+    }
+    
+    if (selectedMyGroup) {
+      return <MyGroupDetailScreen group={selectedMyGroup} onBack={handleBackFromMyGroupDetails} onGoToChat={handleViewGroupChat} />;
+    }
+    
+    if (activeChatGroup) {
+      return <GroupChatScreen group={activeChatGroup} onBack={() => setActiveChatGroup(null)} profile={profile} onSendMessage={handleSendMessage} />;
+    }
+
+    if (viewingAllMyGroups) {
+      return <AllMyGroupsScreen
+        groups={myGroups}
+        onBack={() => setViewingAllMyGroups(false)}
+        onViewGroupChat={handleViewGroupChat}
+        onViewMyGroupDetails={handleViewMyGroupDetails}
+      />;
     }
 
     if (selectedMovie) {
@@ -1405,14 +1309,6 @@ const AppContent: React.FC = () => {
             onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })} 
             onSelectSeries={(seriesId) => alert(`Detalhes para a série ID ${seriesId} serão adicionados em breve!`)}
         />
-    }
-    
-    if (selectedMyGroup) {
-      return <MyGroupDetailScreen group={selectedMyGroup} onBack={handleBackFromMyGroupDetails} onGoToChat={handleViewGroupChat} />;
-    }
-    
-    if (activeChatGroup) {
-      return <GroupChatScreen group={activeChatGroup} onBack={() => setActiveChatGroup(null)} profile={profile} onSendMessage={handleSendMessage} />;
     }
     
     if (isInPaymentFlow && selectedGroup) {
@@ -1694,12 +1590,13 @@ const AppContent: React.FC = () => {
             onEnterAdminMode={handleEnterAdminMode}
             notificationCount={unreadCount}
             onNotificationClick={handleNotificationClick}
+            onViewAllGroups={() => setViewingAllMyGroups(true)}
         />;
     }
   };
   
   const isIntroPlaying = !!introState;
-  const isNavHidden = isThemeModalOpen || isAdminView || isIntroPlaying || !session || !!activeDevScreen || !!selectedGroup || isInPaymentFlow || profileView !== 'main' || walletView !== 'main' || exploreView !== 'main' || !!activeChatGroup || !!selectedMyGroup || !!selectedExploreItem || !!selectedMovie || !!selectedProvider || viewingNetflix || viewingDisneyPlus || viewingPrimeVideo || viewingMax || !!selectedBrand;
+  const isNavHidden = isThemeModalOpen || isAdminView || isIntroPlaying || !session || !!activeDevScreen || !!selectedGroup || isInPaymentFlow || profileView !== 'main' || walletView !== 'main' || exploreView !== 'main' || !!activeChatGroup || !!selectedMyGroup || !!selectedExploreItem || !!selectedMovie || !!selectedProvider || viewingNetflix || viewingDisneyPlus || viewingPrimeVideo || viewingMax || !!selectedBrand || viewingAllMyGroups;
 
   return (
     <div onClick={unlockAudio} className={`font-sans max-w-md mx-auto min-h-screen ${theme === 'dark' ? 'dark' : ''}`}>
@@ -1708,7 +1605,6 @@ const AppContent: React.FC = () => {
                 title={notification.title}
                 body={notification.body}
                 onClose={() => setNotification(null)}
-                onClick={notification.onClick}
             />
         )}
        <ThemeSelectionModal isOpen={isThemeModalOpen} onClose={() => setIsThemeModalOpen(false)} />

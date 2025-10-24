@@ -21,10 +21,11 @@ interface HomeScreenProps {
     onEnterAdminMode: () => void;
     notificationCount: number;
     onNotificationClick: () => void;
+    onViewAllGroups: () => void;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = (props) => {
-    const { onViewGroupChat, onViewMyGroupDetails, groups, profile, onOpenDevMenu, onNavigateToExplore, onNavigateToWallet, onNavigateToProfile, onNavigateToSupport, onNavigateToAddMoney, onEnterAdminMode, notificationCount, onNotificationClick } = props;
+    const { onViewGroupChat, onViewMyGroupDetails, groups, profile, onOpenDevMenu, onNavigateToExplore, onNavigateToWallet, onNavigateToProfile, onNavigateToSupport, onNavigateToAddMoney, onEnterAdminMode, notificationCount, onNotificationClick, onViewAllGroups } = props;
     const { theme } = useTheme();
     const mainBg = theme === 'dark' ? "bg-[#10081C]" : "bg-[#F8F9FA]";
     
@@ -34,7 +35,7 @@ const HomeScreen: React.FC<HomeScreenProps> = (props) => {
       <main className="p-4 sm:p-6 space-y-8">
         <BalanceCard profile={profile} onAddMoney={onNavigateToAddMoney} />
         <QuickActions onNavigateToExplore={onNavigateToExplore} onNavigateToWallet={onNavigateToWallet} onNavigateToProfile={onNavigateToProfile} onNavigateToSupport={onNavigateToSupport} />
-        <MyGroups onViewGroupChat={onViewGroupChat} onViewMyGroupDetails={onViewMyGroupDetails} groups={groups} />
+        <MyGroups onViewGroupChat={onViewGroupChat} onViewMyGroupDetails={onViewMyGroupDetails} groups={groups} onViewAllGroups={onViewAllGroups} />
         <RecentActivity />
       </main>
     </div>
