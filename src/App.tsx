@@ -522,6 +522,45 @@ const AppContent: React.FC = () => {
     setUnreadCount(0);
   };
 
+  const handleTestNotification = async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+        alert('Este navegador não suporta notificações.');
+        return;
+    }
+
+    if (Notification.permission === 'granted') {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            const notificationTitle = 'Exemplo de Notificação ✨';
+            const notificationOptions = {
+                body: 'É assim que as notificações ricas aparecerão no seu dispositivo!',
+                icon: 'https://img.icons8.com/fluency/192/play-button-circled.png',
+                badge: 'https://img.icons8.com/fluency/192/play-button-circled.png',
+                image: 'https://i.ibb.co/h1WqNfN/screenshot-narrow-2.png',
+                vibrate: [200, 100, 200],
+                tag: 'gsb-test-notification',
+                actions: [
+                  { action: 'explore', title: 'Explorar Grupos' },
+                  { action: 'open', title: 'Abrir App' }
+                ],
+                data: {
+                    url: '/?view=explore'
+                }
+            };
+            await registration.showNotification(notificationTitle, notificationOptions);
+            alert("Notificação de teste enviada!");
+        } catch (error) {
+            console.error("Erro ao mostrar notificação de teste:", error);
+            alert("Falha ao exibir a notificação de teste.");
+        }
+    } else if (Notification.permission === 'default') {
+        alert('Por favor, permita as notificações primeiro.');
+        handleAllowNotifications();
+    } else {
+        alert('As notificações estão bloqueadas. Habilite-as nas configurações do seu navegador para este site.');
+    }
+};
+
   useEffect(() => {
     setProfileView('main');
     setWalletView('main');
@@ -1284,6 +1323,7 @@ const AppContent: React.FC = () => {
             onBack={() => setIsAdminView(false)} 
             onInstallApp={handleInstallClick}
             showInstallButton={!!deferredInstallPrompt}
+            onTestNotification={handleTestNotification}
         />;
     }
     

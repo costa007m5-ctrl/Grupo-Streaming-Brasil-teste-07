@@ -19,6 +19,7 @@ interface AdminScreenProps {
     onBack: () => void;
     onInstallApp: () => void;
     showInstallButton: boolean;
+    onTestNotification: () => void;
 }
 
 const Header: React.FC<{ onBack: () => void; title: string }> = ({ onBack, title }) => (
@@ -293,7 +294,7 @@ const SupportView: React.FC<{ tickets: SupportTicket[], onSelectTicket: (ticket:
     );
 }
 
-const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showInstallButton }) => {
+const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showInstallButton, onTestNotification }) => {
     const [activeView, setActiveView] = useState<AdminView>('stats');
     const [isLoading, setIsLoading] = useState(true);
     const [allUsers, setAllUsers] = useState<Profile[]>([]);
@@ -363,22 +364,11 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showIns
             setAllTickets(allTickets.map(t => t.id === ticketId ? updatedTicket : t));
         }
     };
-
-    const handleTestNotification = () => {
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('Teste de Notificação', {
-                body: 'Esta é uma notificação de teste do modo Admin!',
-                icon: 'https://img.icons8.com/fluency/192/play-button-circled.png'
-            });
-        } else {
-            alert('A permissão de notificação não foi concedida. Ative nas configurações do navegador.');
-        }
-    };
     
     const renderCurrentView = () => {
         switch (activeView) {
             case 'stats':
-                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={handleTestNotification} />;
+                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={onTestNotification} />;
             case 'users':
                 return <ListView items={allUsers} CardComponent={UserCard} title="Usuários" />;
             case 'groups':
@@ -390,7 +380,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showIns
             case 'publicidade':
                 return <AdvertisingView groups={allGroups} />;
             default:
-                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={handleTestNotification} />;
+                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={onTestNotification} />;
         }
     };
 
