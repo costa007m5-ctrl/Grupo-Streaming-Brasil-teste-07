@@ -85,6 +85,7 @@
     { "origin": "*.grupostreamingbrasil.com.br" },
     { "origin": "grupostreamingbrasil.com.br" },
     { "origin": "*.vercel.app" },
+    { "origin": "*.netlify.app" },
     { "origin": "*.supabase.co" },
     { "origin": "*.icons8.com" },
     { "origin": "*.ibb.co" },
