@@ -1028,13 +1028,18 @@ const AppContent: React.FC = () => {
     const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
     if (!targetGroup) return;
 
-    const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
-
-    const { error } = await supabase.from('groups').update({ chat_history: updatedChatHistory }).eq('id', groupId);
+    // Call the RPC function to send the message.
+    // The backend will verify if the user is a member.
+    const { error } = await supabase.rpc('send_group_message', {
+        group_id_to_update: groupId,
+        new_message: newMessage
+    });
 
     if (error) {
         alert('Falha ao enviar mensagem: ' + error.message);
     } else {
+        // Optimistically update the UI
+        const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
         const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
         setMyGroups(prev => updateGroupState(prev));
         setExploreGroups(prev => updateGroupState(prev));
@@ -1271,14 +1276,14 @@ const AppContent: React.FC = () => {
         return renderAuthContent();
     }
     
-    if (selectedMyGroup) {
-      return <MyGroupDetailScreen group={selectedMyGroup} onBack={handleBackFromMyGroupDetails} onGoToChat={handleViewGroupChat} />;
-    }
-    
     if (activeChatGroup) {
       return <GroupChatScreen group={activeChatGroup} onBack={() => setActiveChatGroup(null)} profile={profile} onSendMessage={handleSendMessage} />;
     }
 
+    if (selectedMyGroup) {
+      return <MyGroupDetailScreen group={selectedMyGroup} onBack={handleBackFromMyGroupDetails} onGoToChat={handleViewGroupChat} />;
+    }
+    
     if (viewingAllMyGroups) {
       return <AllMyGroupsScreen
         groups={myGroups}
