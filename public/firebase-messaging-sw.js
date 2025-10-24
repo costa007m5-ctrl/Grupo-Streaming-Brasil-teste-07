@@ -10,12 +10,13 @@ const { CacheableResponsePlugin } = cacheableResponse;
 const { ExpirationPlugin } = expiration;
 const { BackgroundSyncPlugin } = backgroundSync;
 
-const offlineFallbackPage = '/offline.html';
+const offlineFallbackPage = 'offline.html';
 
 // Precache the app shell and offline page.
 precacheAndRoute([
   { url: '/', revision: null },
   { url: '/index.html', revision: null },
+  { url: '/index.tsx', revision: null },
   { url: '/manifest.json', revision: null },
   { url: 'https://img.icons8.com/fluency/192/play-button-circled.png', revision: null },
   { url: offlineFallbackPage, revision: null },
@@ -146,30 +147,33 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-  // Prefer data payload for more control, fallback to notification payload
   const notificationData = payload.data || payload.notification || {};
-  
   const notificationTitle = notificationData.title || 'Grupo Streaming Brasil';
-  const notificationOptions = {
-    body: notificationData.body,
-    // Icon: a small icon for the notification. This is what shows up in the status bar.
-    icon: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-    // Badge: a monochrome icon for Android devices.
-    badge: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-    // Image: A larger image to display within the notification.
-    image: notificationData.image, // Assumes server might send an image
-    // Vibrate: A vibration pattern.
-    vibrate: [200, 100, 200],
-    // Tag: An ID for the notification. Notifications with the same tag will replace each other.
-    tag: 'gsb-notification',
-    // Actions: Buttons for users to interact with.
-    actions: [
+  
+  let urlToOpen = notificationData.url || '/';
+  let actions = [
       { action: 'explore', title: 'Explorar Grupos' },
       { action: 'open', title: 'Abrir App' }
-    ],
-    // Data to pass to the notificationclick event
+  ];
+  let tag = 'gsb-notification';
+
+  // If it's a chat message, construct the deep link URL and customize actions
+  if (notificationData.type === 'chat_message' && notificationData.groupId) {
+    urlToOpen = `/?chatGroupId=${notificationData.groupId}`;
+    actions = [{ action: 'open', title: 'Abrir Chat' }];
+    tag = `chat-${notificationData.groupId}`; // Group notifications for the same chat
+  }
+  
+  const notificationOptions = {
+    body: notificationData.body,
+    icon: 'https://img.icons8.com/fluency/192/play-button-circled.png',
+    badge: 'https://img.icons8.com/fluency/192/play-button-circled.png',
+    image: notificationData.image,
+    vibrate: [200, 100, 200],
+    tag: tag,
+    actions: actions,
     data: {
-        url: notificationData.url || '/' // Default to opening the app's root
+        url: urlToOpen
     }
   };
 
@@ -179,15 +183,12 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     
-    // Default URL is from notification data, or root
     let openUrl = event.notification.data.url || '/';
 
-    // Check which action was clicked
     if (event.action === 'explore') {
         openUrl = '/?view=explore';
-    } else if (event.action === 'open') {
-        openUrl = '/';
     }
+    // The 'open' action will use the URL from the data payload, which is correctly set.
 
     const urlToOpen = new URL(openUrl, self.location.origin).href;
 
@@ -198,7 +199,6 @@ self.addEventListener('notificationclick', (event) => {
         let matchingClient = null;
         for (let i = 0; i < windowClients.length; i++) {
             const windowClient = windowClients[i];
-            // Check if a client for the base URL is already open
             if (new URL(windowClient.url).origin === self.location.origin) {
                 matchingClient = windowClient;
                 break;
@@ -206,11 +206,9 @@ self.addEventListener('notificationclick', (event) => {
         }
 
         if (matchingClient) {
-            // If a window is already open, navigate it to the target URL and focus it
             matchingClient.navigate(urlToOpen);
             return matchingClient.focus();
         } else {
-            // Otherwise, open a new window
             return clients.openWindow(urlToOpen);
         }
     });

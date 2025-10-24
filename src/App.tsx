@@ -166,7 +166,7 @@ const AppContent: React.FC = () => {
   const [selectedMaxItem, setSelectedMaxItem] = useState<ContentItem | null>(null);
 
   // Notifications
-  const [notification, setNotification] = useState<{title: string, body: string} | null>(null);
+  const [notification, setNotification] = useState<{title: string, body: string, onClick?: () => void} | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
@@ -382,8 +382,9 @@ const AppContent: React.FC = () => {
       if (groupsError) throw groupsError;
       if (groupsData) {
         const allGroups = groupsData as Group[];
+        const userGroups = allGroups.filter(g => g.members_list.some(m => m.id === session.user.id));
         setExploreGroups(allGroups);
-        setMyGroups(allGroups);
+        setMyGroups(userGroups);
       }
     } catch (error) {
       const typedError = error as { message: string };
@@ -458,9 +459,23 @@ const AppContent: React.FC = () => {
     const unsubscribe = onMessage(messaging, (payload) => {
         console.log('Mensagem recebida em primeiro plano. ', payload);
         if (payload.notification) {
+            let clickHandler = () => handleNotificationClick(); // Default handler
+
+            if (payload.data?.type === 'chat_message' && payload.data?.groupId) {
+                const groupId = parseInt(payload.data.groupId, 10);
+                const targetGroup = exploreGroups.find(g => g.id === groupId); 
+                if (targetGroup) {
+                    // If a chat message, create a specific handler to open the chat
+                    clickHandler = () => {
+                        setActiveChatGroup(targetGroup);
+                    };
+                }
+            }
+
             setNotification({
                 title: payload.notification.title || 'Nova Notificação',
-                body: payload.notification.body || ''
+                body: payload.notification.body || '',
+                onClick: clickHandler
             });
             setNotifications(prev => [payload.notification, ...prev]);
             setUnreadCount(prev => prev + 1);
@@ -470,7 +485,42 @@ const AppContent: React.FC = () => {
     return () => {
         unsubscribe();
     };
-  }, [session, profile]);
+  }, [session, profile, myGroups, exploreGroups]);
+
+  // Handle deep linking from URL
+  useEffect(() => {
+    const handleDeepLink = async () => {
+        const params = new URLSearchParams(window.location.search);
+        const chatGroupId = params.get('chatGroupId');
+
+        if (chatGroupId && session) {
+            const groupId = parseInt(chatGroupId, 10);
+            if (!isNaN(groupId)) {
+                const existingGroup = exploreGroups.find(g => g.id === groupId);
+                if (existingGroup) {
+                    setActiveChatGroup(existingGroup);
+                } else {
+                    setLoading(true);
+                    const { data: group, error } = await supabase
+                        .from('groups')
+                        .select('*')
+                        .eq('id', groupId)
+                        .maybeSingle();
+                    setLoading(false);
+                    
+                    if (error) console.error('Error fetching group for deep link:', error);
+                    else if (group) setActiveChatGroup(group);
+                }
+            }
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    };
+
+    if(session && (exploreGroups.length > 0 || myGroups.length > 0)) {
+         handleDeepLink();
+    }
+}, [session, exploreGroups, myGroups]);
 
   // Setup Periodic Background Sync
   useEffect(() => {
@@ -508,6 +558,7 @@ const AppContent: React.FC = () => {
 
   const handleAllowNotifications = async () => {
       setShowNotificationPrompt(false);
+      sessionStorage.setItem('notification_prompt_dismissed', 'true');
       await getAndSavePushToken();
   };
 
@@ -1662,6 +1713,7 @@ const AppContent: React.FC = () => {
                 title={notification.title}
                 body={notification.body}
                 onClose={() => setNotification(null)}
+                onClick={notification.onClick}
             />
         )}
        <ThemeSelectionModal isOpen={isThemeModalOpen} onClose={() => setIsThemeModalOpen(false)} />
