@@ -39,35 +39,35 @@
   "screenshots": [
     {
       "src": "/screenshots/screenshot-narrow-1.png",
-      "sizes": "1024x1792",
+      "sizes": "768x1408",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Tela Inicial com saldo e grupos de streaming"
     },
     {
       "src": "/screenshots/screenshot-narrow-2.png",
-      "sizes": "1024x1792",
+      "sizes": "768x1408",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Explore grupos de diversos serviços de streaming"
     },
     {
       "src": "/screenshots/screenshot-narrow-3.png",
-      "sizes": "1024x1792",
+      "sizes": "768x1408",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Gerencie sua carteira digital com facilidade"
     },
     {
       "src": "/screenshots/screenshot-wide-1.png",
-      "sizes": "1792x1024",
+      "sizes": "1408x768",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Visão ampla do marketplace de grupos de streaming"
     },
     {
       "src": "/screenshots/screenshot-wide-2.png",
-      "sizes": "1792x1024",
+      "sizes": "1408x768",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Detalhes de um grupo em tela cheia"
