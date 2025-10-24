@@ -1,10 +1,8 @@
-// FIX: Replaced the bare module import with a dynamic import from a CDN.
-// This ensures the Google GenAI SDK is resolved correctly within the Vercel serverless
-// environment, which may not have a standard node_modules resolution process.
-const { GoogleGenAI, Modality } = await import('https://cdn.jsdelivr.net/npm/@google/genai@latest/dist/index.js');
-
 
 export default async function handler(req, res) {
+  // Dynamically import to avoid top-level await issues
+  const { GoogleGenAI, Modality } = await import('https://cdn.jsdelivr.net/npm/@google/genai@latest/dist/index.js');
+
   // Configura os cabeçalhos CORS para permitir chamadas do seu frontend
   res.setHeader('Access-Control-Allow-Origin', '*'); // Em produção, restrinja para o seu domínio
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
