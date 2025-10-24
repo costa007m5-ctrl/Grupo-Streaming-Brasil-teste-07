@@ -1333,91 +1333,6 @@ const AppContent: React.FC = () => {
           }
       }
   }, [initialChatGroupId, allGroups]);
-  
-    const handleUpdateProfilePrivacy = async (updates: { is_profile_private?: boolean; is_searchable?: boolean; }) => {
-        if (!profile) return;
-        const { data, error } = await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', profile.id)
-            .select()
-            .single();
-
-        if (error) {
-            alert('Erro ao atualizar privacidade: ' + error.message);
-        } else {
-            setProfile(data as Profile);
-            alert('Configurações de privacidade salvas!');
-        }
-    };
-    
-    const handleRequestDataDownload = async () => {
-        if (!profile) return;
-        
-        try {
-            const { data: transactions, error: txError } = await supabase
-                .from('transactions')
-                .select('*')
-                .eq('user_id', profile.id);
-
-            if (txError) throw txError;
-            
-            const userGroups = allGroups.filter(g => g.members_list.some(m => m.id === profile.id));
-
-            const dataToDownload = {
-                profile: {
-                    id: profile.id,
-                    full_name: profile.full_name,
-                    email: session?.user.email,
-                    wallet_id: profile.wallet_id,
-                    created_at: profile.created_at,
-                    is_verified: profile.is_verified,
-                },
-                groups: userGroups.map(g => ({ id: g.id, name: g.name, host_name: g.host_name })),
-                transactions: transactions,
-            };
-            
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToDownload, null, 2));
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "meus_dados_gsb.json");
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
-            alert('O download dos seus dados foi iniciado.');
-
-        } catch (error: any) {
-             alert('Erro ao coletar dados para download: ' + error.message);
-        }
-    };
-    
-    const handleRequestAccountDeletion = async () => {
-        if (!profile) return;
-        if (!window.confirm("Você tem certeza que deseja solicitar a exclusão da sua conta? Esta ação é irreversível.")) {
-            return;
-        }
-
-        const subject = `[EXCLUSÃO DE CONTA] Usuário: ${profile.full_name} (${profile.id})`;
-        const messageText = `Eu, ${profile.full_name}, portador do ID de usuário ${profile.id}, solicito formalmente a exclusão permanente da minha conta e de todos os meus dados associados à plataforma Grupo Streaming Brasil.`;
-        
-        const initialMessage = {
-            sender_id: profile.id,
-            sender_name: profile.full_name,
-            text: messageText,
-            timestamp: new Date().toISOString()
-        };
-
-        const { error } = await supabase
-            .from('support_tickets')
-            .insert({ user_id: profile.id, subject, messages: [initialMessage], status: 'aberto' });
-        
-        if (error) {
-            alert("Erro ao criar solicitação de exclusão: " + error.message);
-        } else {
-            alert("Sua solicitação de exclusão de conta foi recebida. Nossa equipe entrará em contato por e-mail para confirmar os próximos passos. Após a confirmação, sua conta será desconectada.");
-            handleLogout();
-        }
-    };
 
   const renderAuthContent = () => {
     switch(authView) {
@@ -1551,15 +1466,15 @@ const AppContent: React.FC = () => {
           case 'biometrics':
             return <BiometricsScreen onBack={goBack} />;
           case 'changePassword':
-            return <ChangePasswordScreen onBack={goBack} onPasswordUpdated={() => { alert('Senha alterada com sucesso!'); handleBackToSecurity(); }} />;
+            return <ChangePasswordScreen onBack={goBack} />;
           case 'connectedDevices':
             return <ConnectedDevicesScreen onBack={goBack} />;
           case 'profilePrivacy':
-            return <ProfilePrivacyScreen onBack={goBack} profile={profile} onSave={handleUpdateProfilePrivacy} />;
+            return <ProfilePrivacyScreen onBack={goBack} />;
           case 'personalData':
-            return <PersonalDataScreen onBack={goBack} onDownload={handleRequestDataDownload} onDelete={handleRequestAccountDeletion} />;
+            return <PersonalDataScreen onBack={goBack} />;
           case 'activityHistory':
-            return <ActivityHistoryScreen onBack={goBack} profile={profile} />;
+            return <ActivityHistoryScreen onBack={goBack} />;
           case 'soundSettings':
             return <SoundSettingsScreen onBack={goBack} />;
           case 'designSettings':
@@ -1800,8 +1715,7 @@ const AppContent: React.FC = () => {
                 title={notification.title}
                 body={notification.body}
                 onClose={() => setNotification(null)}
-                onClick={handleNotificationToastClick}
-                data={notification.data}
+                onClick={() => handleNotificationToastClick(notification.data)}
             />
         )}
        <ThemeSelectionModal isOpen={isThemeModalOpen} onClose={() => setIsThemeModalOpen(false)} />
