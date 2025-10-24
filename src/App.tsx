@@ -1,3 +1,4 @@
+// FIX: Imported useMemo hook from React to resolve 'Cannot find name useMemo' error.
 import React, { useState, useEffect, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
 import BottomNav from './components/BottomNav';
 import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';

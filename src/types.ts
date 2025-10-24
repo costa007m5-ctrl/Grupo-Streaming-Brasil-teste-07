@@ -168,6 +168,8 @@ export interface TvShow {
   name: string;
   poster_path: string;
   vote_average: number;
+  // FIX: Added optional properties to match TMDB API response for TV shows
+  // This will fix typing issues in Netflix-related components.
   backdrop_path?: string;
   overview?: string;
   first_air_date?: string;
