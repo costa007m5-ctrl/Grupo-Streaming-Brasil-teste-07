@@ -1,4 +1,4 @@
-import { MercadoPagoConfig, Payment } from "mercadopago";
+const { MercadoPagoConfig, Payment } = await import('https://esm.sh/mercadopago@2.9.0');
 
 export default async function handler(req, res) {
   // Adiciona cabeçalhos CORS para desenvolvimento
@@ -86,18 +86,15 @@ export default async function handler(req, res) {
     
     let specificMessage = "Falha ao criar pagamento por Boleto.";
     
-    // Tenta extrair a mensagem da estrutura de erro do SDK do Mercado Pago
     const apiErrorData = error.data || error.cause?.api_response?.data;
 
     if (apiErrorData) {
-      // A lista 'cause' geralmente contém os erros de validação mais específicos
       if (Array.isArray(apiErrorData.cause) && apiErrorData.cause.length > 0) {
         specificMessage = apiErrorData.cause.map(c => c.description || JSON.stringify(c)).join('; ');
       } else if (apiErrorData.message) {
         specificMessage = apiErrorData.message;
       }
     } else if (error.message) {
-      // Fallback para a mensagem de erro genérica do objeto de erro
       specificMessage = error.message;
     }
 

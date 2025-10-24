@@ -1,4 +1,4 @@
-import { MercadoPagoConfig, Payment } from "mercadopago";
+const { MercadoPagoConfig, Payment } = await import('https://esm.sh/mercadopago@2.9.0');
 
 export default async function handler(req, res) {
   // Adiciona cabeçalhos CORS para desenvolvimento
