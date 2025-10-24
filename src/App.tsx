@@ -1800,7 +1800,7 @@ const AppContent: React.FC = () => {
                 title={notification.title}
                 body={notification.body}
                 onClose={() => setNotification(null)}
-                onClick={() => handleNotificationToastClick(notification.data)}
+                onClick={handleNotificationToastClick}
                 data={notification.data}
             />
         )}
