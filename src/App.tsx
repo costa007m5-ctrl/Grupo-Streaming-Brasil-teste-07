@@ -374,17 +374,24 @@ const AppContent: React.FC = () => {
 
       setProfile(profileData as Profile);
 
-      const { data: groupsData, error: groupsError } = await supabase
+      // Fetch all public group data for the Explore screen
+      const { data: exploreGroupsData, error: exploreGroupsError } = await supabase
+        .rpc('get_explore_groups');
+      
+      if (exploreGroupsError) throw exploreGroupsError;
+      if (exploreGroupsData) {
+        setExploreGroups(exploreGroupsData as Group[]);
+      }
+
+      // Fetch the user's groups with full data (credentials, chat) using RLS
+      const { data: myGroupsData, error: myGroupsError } = await supabase
         .from('groups')
         .select('*')
         .order('id', { ascending: false });
 
-      if (groupsError) throw groupsError;
-      if (groupsData) {
-        const allGroups = groupsData as Group[];
-        const userGroups = allGroups.filter(g => g.members_list.some(m => m.id === session.user.id));
-        setExploreGroups(allGroups);
-        setMyGroups(userGroups);
+      if (myGroupsError) throw myGroupsError;
+      if (myGroupsData) {
+        setMyGroups(myGroupsData as Group[]);
       }
     } catch (error) {
       const typedError = error as { message: string };
@@ -907,48 +914,24 @@ const AppContent: React.FC = () => {
 
     const handleJoinGroup = async (groupToJoin: Group) => {
         if (!profile) { alert("Você precisa estar logado para entrar em um grupo."); return; }
-        if (profile.balance < groupToJoin.price) { alert("Saldo insuficiente."); return; }
-        if (groupToJoin.members_list.some(m => m.id === profile.id)) { alert("Você já está neste grupo."); return; }
-        if (groupToJoin.members >= groupToJoin.max_members) { alert("Grupo está lotado."); return; }
-
-        const newMember: GroupMember = {
-            id: profile.id,
-            name: profile.full_name,
-            role: 'Membro' as const,
-            joinDate: new Date().toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', ''),
-            avatarUrl: profile.avatar_url
-        };
         
-        const newMembersList = [...groupToJoin.members_list, newMember];
-        const newMemberCount = groupToJoin.members + 1;
-        const newBalance = profile.balance - groupToJoin.price;
-
-        const { error: transactionInsertError } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: profile.id,
-                amount: -groupToJoin.price,
-                type: 'payment',
-                description: `Pagamento grupo ${groupToJoin.name}`,
-                metadata: { group_id: groupToJoin.id }
+        try {
+            const { error } = await supabase.rpc('join_group', {
+                group_id_to_join: groupToJoin.id
             });
 
-        const { error: groupUpdateError } = await supabase.from('groups').update({
-            members: newMemberCount,
-            members_list: newMembersList
-        }).eq('id', groupToJoin.id);
+            if (error) {
+                throw error;
+            }
 
-        const { error: profileUpdateError } = await supabase.from('profiles').update({
-            balance: newBalance
-        }).eq('id', profile.id);
-
-        if (groupUpdateError || profileUpdateError || transactionInsertError) {
-            alert("Erro ao entrar no grupo. Se o valor foi debitado, contate o suporte.");
-        } else {
             alert("Você entrou no grupo com sucesso!");
-            fetchUserData();
+            fetchUserData(); // Refetch data to update UI
             setIsInPaymentFlow(false);
             setSelectedGroup(null);
+
+        } catch (error: any) {
+            console.error("Erro ao entrar no grupo:", error);
+            alert(`Erro ao entrar no grupo: ${error.message}`);
         }
     };
     
@@ -1142,22 +1125,34 @@ const AppContent: React.FC = () => {
   };
 
   const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
+    // Optimistic UI Update
     const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
     if (!targetGroup) return;
 
     const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
+    const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
+    
+    setMyGroups(prev => updateGroupState(prev));
+    setExploreGroups(prev => updateGroupState(prev));
+    if (activeChatGroup?.id === groupId) {
+        setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
+    }
+    
+    // Call the RPC function to persist the message
+    try {
+        const { error } = await supabase.rpc('send_group_message', {
+            group_id_to_update: groupId,
+            new_message: newMessage
+        });
 
-    const { error } = await supabase.from('groups').update({ chat_history: updatedChatHistory }).eq('id', groupId);
-
-    if (error) {
-        alert('Falha ao enviar mensagem: ' + error.message);
-    } else {
-        const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
-        setMyGroups(prev => updateGroupState(prev));
-        setExploreGroups(prev => updateGroupState(prev));
-        if (activeChatGroup?.id === groupId) {
-            setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
+        if (error) {
+            throw error;
         }
+    } catch (error: any) {
+        console.error('Falha ao enviar mensagem:', error);
+        alert('Falha ao enviar mensagem: ' + error.message);
+        // Revert optimistic update on error by refetching data
+        fetchUserData();
     }
   };
 
