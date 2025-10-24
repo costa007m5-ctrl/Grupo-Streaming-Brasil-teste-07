@@ -1,4 +1,3 @@
-// FIX: Imported useMemo hook from React to resolve 'Cannot find name useMemo' error.
 import React, { useState, useEffect, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
 import BottomNav from './components/BottomNav';
 import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';
@@ -1151,6 +1150,50 @@ const AppContent: React.FC = () => {
         }
     };
 
+    const handleSavePrivacySettings = async (updates: { is_profile_private?: boolean; is_searchable?: boolean; }) => {
+        if (!profile) return;
+        const { data, error } = await supabase.from('profiles').update(updates).eq('id', profile.id).select().single();
+        if (error) {
+            alert('Erro ao salvar configurações: ' + error.message);
+        } else {
+            setProfile(data as Profile);
+            alert('Configurações de privacidade salvas!');
+            handleBackToSecurity();
+        }
+    };
+
+    const handleDownloadData = () => {
+        if (!profile) return;
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(profile, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `dados_gsb_${profile.id}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        alert('O download dos seus dados foi iniciado.');
+    };
+
+    const handleDeleteAccount = () => {
+        if (!profile || !session) return;
+        const confirmation = window.confirm("Isso abrirá um ticket de suporte para solicitar a exclusão permanente da sua conta, de acordo com nossos Termos de Uso. Deseja continuar?");
+        if (confirmation) {
+            const createTicket = async () => {
+                const subject = `[EXCLUSÃO DE CONTA] Solicitação para ${profile.full_name}`;
+                const messageText = `Eu, ${profile.full_name}, portador do e-mail ${session?.user.email}, solicito a exclusão permanente da minha conta e de todos os meus dados associados, de acordo com os termos de uso.`;
+                const initialMessage = { sender_id: profile.id, sender_name: 'user', text: messageText, timestamp: new Date().toISOString() };
+                const { error } = await supabase.from('support_tickets').insert({ user_id: profile.id, subject, messages: [initialMessage], status: 'aberto' });
+                if (error) {
+                    alert('Erro ao criar solicitação: ' + error.message);
+                } else {
+                    alert('Sua solicitação de exclusão foi enviada. Nossa equipe entrará em contato em breve através da Central de Ajuda.');
+                    handleNavigateProfile('support');
+                }
+            };
+            createTicket();
+        }
+    };
+
 
   const handleEmailLogin = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -1261,8 +1304,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // Back button and navigation logic
-  // FIX: Moved 'isIntroPlaying' declaration before its use in 'goBack' to fix a ReferenceError.
   const isIntroPlaying = !!introState;
   const goBack = useCallback(() => {
     if (isIntroPlaying || showSplashScreen || showPostLoginSplash) return;
@@ -1306,7 +1347,6 @@ const AppContent: React.FC = () => {
         goBack();
     };
     window.addEventListener('popstate', handlePopState);
-    // Push an initial state to ensure the first back press is caught
     window.history.pushState({ appState: 'initial' }, '');
 
     return () => {
@@ -1319,7 +1359,6 @@ const AppContent: React.FC = () => {
       const chatGroupId = params.get('chatGroupId');
       if (chatGroupId) {
           setInitialChatGroupId(chatGroupId);
-          // Clean the URL
           window.history.replaceState(null, '', window.location.pathname);
       }
   }, []);
@@ -1329,7 +1368,7 @@ const AppContent: React.FC = () => {
           const group = allGroups.find(g => g.id === parseInt(initialChatGroupId, 10));
           if (group) {
               handleViewGroupChat(group);
-              setInitialChatGroupId(null); // Consume it
+              setInitialChatGroupId(null);
           }
       }
   }, [initialChatGroupId, allGroups]);
@@ -1466,15 +1505,15 @@ const AppContent: React.FC = () => {
           case 'biometrics':
             return <BiometricsScreen onBack={goBack} />;
           case 'changePassword':
-            return <ChangePasswordScreen onBack={goBack} />;
+            return <ChangePasswordScreen onBack={goBack} onPasswordUpdated={handleBackToSecurity} />;
           case 'connectedDevices':
             return <ConnectedDevicesScreen onBack={goBack} />;
           case 'profilePrivacy':
-            return <ProfilePrivacyScreen onBack={goBack} />;
+            return <ProfilePrivacyScreen onBack={goBack} profile={profile} onSave={handleSavePrivacySettings} />;
           case 'personalData':
-            return <PersonalDataScreen onBack={goBack} />;
+            return <PersonalDataScreen onBack={goBack} onDownload={handleDownloadData} onDelete={handleDeleteAccount} />;
           case 'activityHistory':
-            return <ActivityHistoryScreen onBack={goBack} />;
+            return <ActivityHistoryScreen onBack={goBack} profile={profile} />;
           case 'soundSettings':
             return <SoundSettingsScreen onBack={goBack} />;
           case 'designSettings':
@@ -1715,7 +1754,8 @@ const AppContent: React.FC = () => {
                 title={notification.title}
                 body={notification.body}
                 onClose={() => setNotification(null)}
-                onClick={() => handleNotificationToastClick(notification.data)}
+                onClick={handleNotificationToastClick}
+                data={notification.data}
             />
         )}
        <ThemeSelectionModal isOpen={isThemeModalOpen} onClose={() => setIsThemeModalOpen(false)} />
@@ -1762,6 +1802,5 @@ const App: React.FC = () => (
     </SoundProvider>
  </ThemeProvider>
 );
-
 
 export default App;
