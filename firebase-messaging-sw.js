@@ -16,7 +16,6 @@ const offlineFallbackPage = 'offline.html';
 precacheAndRoute([
   { url: '/', revision: null },
   { url: '/index.html', revision: null },
-  { url: '/index.tsx', revision: null },
   { url: '/manifest.json', revision: null },
   { url: 'https://img.icons8.com/fluency/192/play-button-circled.png', revision: null },
   { url: offlineFallbackPage, revision: null },
@@ -151,26 +150,31 @@ messaging.onBackgroundMessage((payload) => {
   const notificationData = payload.data || payload.notification || {};
   
   const notificationTitle = notificationData.title || 'Grupo Streaming Brasil';
+  
+  let urlToOpen = notificationData.url || '/';
+  let actions = [
+    { action: 'explore', title: 'Explorar Grupos' },
+    { action: 'open', title: 'Abrir App' }
+  ];
+  let tag = 'gsb-notification';
+
+  // If it's a chat message, construct the deep link URL and customize actions
+  if (notificationData.type === 'chat_message' && notificationData.groupId) {
+    urlToOpen = `/?chatGroupId=${notificationData.groupId}`;
+    actions = [{ action: 'open_chat', title: 'Responder' }];
+    tag = `chat-${notificationData.groupId}`; // Group notifications for the same chat
+  }
+  
   const notificationOptions = {
     body: notificationData.body,
-    // Icon: a small icon for the notification. This is what shows up in the status bar.
     icon: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-    // Badge: a monochrome icon for Android devices.
     badge: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-    // Image: A larger image to display within the notification.
-    image: notificationData.image, // Assumes server might send an image
-    // Vibrate: A vibration pattern.
+    image: notificationData.image,
     vibrate: [200, 100, 200],
-    // Tag: An ID for the notification. Notifications with the same tag will replace each other.
-    tag: 'gsb-notification',
-    // Actions: Buttons for users to interact with.
-    actions: [
-      { action: 'explore', title: 'Explorar Grupos' },
-      { action: 'open', title: 'Abrir App' }
-    ],
-    // Data to pass to the notificationclick event
+    tag: tag,
+    actions: actions,
     data: {
-        url: notificationData.url || '/' // Default to opening the app's root
+        url: urlToOpen // Pass the final URL here
     }
   };
 
@@ -186,8 +190,8 @@ self.addEventListener('notificationclick', (event) => {
     // Check which action was clicked
     if (event.action === 'explore') {
         openUrl = '/?view=explore';
-    } else if (event.action === 'open') {
-        openUrl = '/';
+    } else if (event.action === 'open_chat' || event.action === 'open') {
+        // The URL is already correctly set in the data payload, so do nothing extra
     }
 
     const urlToOpen = new URL(openUrl, self.location.origin).href;
