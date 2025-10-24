@@ -8,7 +8,15 @@ import {
     MegaphoneIcon,
     SparklesIcon
 } from '../ui/Icons';
-import { requestPermissionAndToken } from '../../lib';
+import { 
+    requestPermissionAndToken,
+    sendPaymentNotification,
+    sendNewMemberNotification,
+    sendPaymentReminderNotification,
+    sendChatMessageNotification,
+    sendPromotionNotification,
+    sendNewContentNotification
+} from '../../lib';
 
 const Header: React.FC<{ onBack: () => void; }> = ({ onBack }) => (
     <header className="sticky top-0 bg-white/80 backdrop-blur-sm z-10 p-4">
@@ -65,28 +73,38 @@ const SettingsToggleItem: React.FC<{ icon: React.ComponentType<{ className?: str
 const NotificationsScreen: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
-    const handleTestNotification = async () => {
+    const handleTestNotification = async (type: string) => {
         setTestStatus('testing');
         
         try {
-            if ('Notification' in window) {
-                const permission = await Notification.requestPermission();
+            const permission = await Notification.requestPermission();
+            
+            if (permission === 'granted') {
+                await requestPermissionAndToken();
                 
-                if (permission === 'granted') {
-                    await requestPermissionAndToken();
-                    
-                    new Notification('🎉 Notificação de Teste', {
-                        body: 'Suas notificações estão funcionando perfeitamente!',
-                        icon: '/icon-192.png',
-                        badge: '/icon-192.png'
-                    });
-                    
-                    setTestStatus('success');
-                    setTimeout(() => setTestStatus('idle'), 3000);
-                } else {
-                    setTestStatus('error');
-                    setTimeout(() => setTestStatus('idle'), 3000);
+                switch(type) {
+                    case 'payment':
+                        await sendPaymentNotification(150.00, 'João Silva');
+                        break;
+                    case 'member':
+                        await sendNewMemberNotification('Netflix Premium 4K', 'Maria Santos', 'https://img.icons8.com/color/96/user-female-circle.png');
+                        break;
+                    case 'reminder':
+                        await sendPaymentReminderNotification('Disney+ Premium', 45.90, 'amanhã');
+                        break;
+                    case 'chat':
+                        await sendChatMessageNotification('Prime Video Família', 'Carlos Oliveira', 'Pessoal, alguém sabe a senha atualizada?', 'https://img.icons8.com/color/96/user-male-circle.png');
+                        break;
+                    case 'promo':
+                        await sendPromotionNotification('Oferta Especial!', 'Ganhe R$ 50 ao convidar 3 amigos para o GSB! 🎁');
+                        break;
+                    case 'content':
+                        await sendNewContentNotification('Netflix', 'Stranger Things - Temporada 5', 'https://img.icons8.com/fluency/480/netflix.png');
+                        break;
                 }
+                
+                setTestStatus('success');
+                setTimeout(() => setTestStatus('idle'), 2000);
             } else {
                 setTestStatus('error');
                 setTimeout(() => setTestStatus('idle'), 3000);
@@ -102,30 +120,79 @@ const NotificationsScreen: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
         <div className="bg-gray-100 min-h-screen">
             <Header onBack={onBack} />
             <main className="p-4 pt-2 space-y-6">
-                <SettingsSection title="Teste">
-                    <div className="p-4">
-                        <button
-                            onClick={handleTestNotification}
-                            disabled={testStatus === 'testing'}
-                            className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg font-medium transition ${
-                                testStatus === 'success' 
-                                    ? 'bg-green-600 text-white' 
-                                    : testStatus === 'error'
-                                    ? 'bg-red-600 text-white'
-                                    : 'bg-purple-600 text-white hover:bg-purple-700'
-                            } ${testStatus === 'testing' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <SparklesIcon className="w-5 h-5" />
-                            <span>
-                                {testStatus === 'testing' && 'Testando...'}
-                                {testStatus === 'success' && '✓ Teste enviado!'}
-                                {testStatus === 'error' && '✗ Erro - Verifique permissões'}
-                                {testStatus === 'idle' && 'Testar Notificação'}
-                            </span>
-                        </button>
-                        <p className="text-xs text-gray-500 text-center mt-2">
-                            Envie uma notificação de teste para verificar se está tudo funcionando
+                <SettingsSection title="Testar Notificações Ricas">
+                    <div className="p-4 space-y-3">
+                        <p className="text-xs text-gray-500 text-center mb-3">
+                            Teste diferentes tipos de notificações expandidas com imagens e botões de ação
                         </p>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => handleTestNotification('payment')}
+                                disabled={testStatus === 'testing'}
+                                className="flex flex-col items-center justify-center space-y-1 py-3 px-2 rounded-lg font-medium transition bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                            >
+                                <span className="text-2xl">💰</span>
+                                <span className="text-xs">Pagamento</span>
+                            </button>
+                            
+                            <button
+                                onClick={() => handleTestNotification('member')}
+                                disabled={testStatus === 'testing'}
+                                className="flex flex-col items-center justify-center space-y-1 py-3 px-2 rounded-lg font-medium transition bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                <span className="text-2xl">👥</span>
+                                <span className="text-xs">Novo Membro</span>
+                            </button>
+                            
+                            <button
+                                onClick={() => handleTestNotification('reminder')}
+                                disabled={testStatus === 'testing'}
+                                className="flex flex-col items-center justify-center space-y-1 py-3 px-2 rounded-lg font-medium transition bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
+                            >
+                                <span className="text-2xl">⏰</span>
+                                <span className="text-xs">Lembrete</span>
+                            </button>
+                            
+                            <button
+                                onClick={() => handleTestNotification('chat')}
+                                disabled={testStatus === 'testing'}
+                                className="flex flex-col items-center justify-center space-y-1 py-3 px-2 rounded-lg font-medium transition bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                            >
+                                <span className="text-2xl">💬</span>
+                                <span className="text-xs">Mensagem</span>
+                            </button>
+                            
+                            <button
+                                onClick={() => handleTestNotification('promo')}
+                                disabled={testStatus === 'testing'}
+                                className="flex flex-col items-center justify-center space-y-1 py-3 px-2 rounded-lg font-medium transition bg-pink-600 text-white hover:bg-pink-700 disabled:opacity-50"
+                            >
+                                <span className="text-2xl">🎁</span>
+                                <span className="text-xs">Promoção</span>
+                            </button>
+                            
+                            <button
+                                onClick={() => handleTestNotification('content')}
+                                disabled={testStatus === 'testing'}
+                                className="flex flex-col items-center justify-center space-y-1 py-3 px-2 rounded-lg font-medium transition bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                                <span className="text-2xl">🎬</span>
+                                <span className="text-xs">Conteúdo</span>
+                            </button>
+                        </div>
+                        
+                        {testStatus === 'success' && (
+                            <div className="bg-green-100 text-green-800 p-3 rounded-lg text-center text-sm font-medium">
+                                ✓ Notificação enviada! Verifique sua barra de notificações
+                            </div>
+                        )}
+                        
+                        {testStatus === 'error' && (
+                            <div className="bg-red-100 text-red-800 p-3 rounded-lg text-center text-sm font-medium">
+                                ✗ Erro - Verifique as permissões de notificação
+                            </div>
+                        )}
                     </div>
                 </SettingsSection>
                 <SettingsSection title="Geral">
