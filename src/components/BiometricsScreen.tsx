@@ -26,19 +26,11 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
 
 const BiometricsScreen: React.FC<{ onBack: () => void; }> = ({ onBack }) => {
     const [enabled, setEnabled] = useState(() => {
-        try {
-            return localStorage.getItem('biometricsEnabled') === 'true';
-        } catch {
-            return false;
-        }
+        return localStorage.getItem('biometricsEnabled') === 'true';
     });
 
     useEffect(() => {
-        try {
-            localStorage.setItem('biometricsEnabled', String(enabled));
-        } catch (error) {
-            console.error("Could not save biometrics setting to localStorage", error);
-        }
+        localStorage.setItem('biometricsEnabled', String(enabled));
     }, [enabled]);
 
     return (

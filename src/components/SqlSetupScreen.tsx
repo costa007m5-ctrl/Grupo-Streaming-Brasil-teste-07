@@ -16,7 +16,6 @@ const MIGRATION_SCRIPT_SQL = `-- SCRIPT DE ATUALIZAÇÃO E MIGRAÇÃO
 -- Execute este script no seu Editor SQL do Supabase para atualizar um banco de dados existente para a versão mais recente sem perder dados.
 
 -- 1. ADICIONAR NOVAS COLUNAS À TABELA DE PERFIS
--- Adiciona created_at para rastrear novos usuários e outras colunas de verificação.
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_phone_verified boolean DEFAULT false;
@@ -32,7 +31,11 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS state text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS fcm_tokens text[];
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_profile_private boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_searchable boolean DEFAULT true;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS host_rating_avg numeric(2, 1) DEFAULT 0.0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS host_rating_count integer DEFAULT 0;
 
+-- Adicionar coluna de reviews na tabela de grupos
+ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS reviews jsonb;
 
 -- 2. CRIAR TABELA DE TICKETS DE SUPORTE (SE NÃO EXISTIR)
 CREATE TABLE IF NOT EXISTS public.support_tickets (
@@ -77,7 +80,6 @@ EXECUTE PROCEDURE public.update_ticket_updated_at_column();
 
 
 -- 3. ATUALIZAR FUNÇÕES RPC (Remote Procedure Call)
--- ... (o resto do script de migração continua igual)
 CREATE OR REPLACE FUNCTION public.get_public_profile_by_wallet_id(p_wallet_id text)
 RETURNS TABLE (
   id uuid,
@@ -165,7 +167,6 @@ END;
 $$;
 
 -- 4. CORRIGIR E ATUALIZAR POLÍTICAS DE SEGURANÇA (RLS)
--- ... (políticas de profiles, groups, transactions continuam iguais)
 DROP POLICY IF EXISTS "Allow read access to profiles" ON public.profiles;
 CREATE POLICY "Allow read access to profiles" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id OR auth.uid() = '206cb0fc-ea8b-4823-9aea-bba231edbaf8');
 
@@ -198,7 +199,10 @@ RETURNS TABLE (
   members_list jsonb,
   rules jsonb,
   credentials jsonb,
-  chat_history jsonb
+  chat_history jsonb,
+  reviews jsonb,
+  host_rating_avg numeric,
+  host_rating_count integer
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -220,9 +224,14 @@ BEGIN
     g.members_list,
     g.rules,
     '{}'::jsonb, -- Retorna um objeto JSON vazio para credentials
-    '[]'::jsonb  -- Retorna um array JSON vazio para chat_history
+    '[]'::jsonb,  -- Retorna um array JSON vazio para chat_history
+    g.reviews,
+    p.host_rating_avg,
+    p.host_rating_count
   FROM
-    public.groups g;
+    public.groups g
+  JOIN
+    public.profiles p ON g.host_id = p.id;
 END;
 $$;
 
@@ -322,6 +331,87 @@ BEGIN
 END;
 $$;
 
+-- 8. NOVA FUNÇÃO RPC PARA SUBMETER AVALIAÇÃO
+CREATE OR REPLACE FUNCTION public.submit_review(p_group_id bigint, p_rating integer, p_comment text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  reviewer_id uuid;
+  reviewer_profile public.profiles;
+  target_group public.groups;
+  new_review jsonb;
+  is_member boolean;
+  has_reviewed boolean;
+  host_profile_id uuid;
+  new_avg numeric;
+  new_count integer;
+BEGIN
+  reviewer_id := auth.uid();
+  
+  -- Get reviewer profile and target group
+  SELECT * INTO reviewer_profile FROM public.profiles WHERE id = reviewer_id;
+  SELECT * INTO target_group FROM public.groups WHERE id = p_group_id;
+
+  -- Validations
+  IF reviewer_profile IS NULL THEN RAISE EXCEPTION 'Perfil do usuário não encontrado.'; END IF;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+  IF p_rating < 1 OR p_rating > 5 THEN RAISE EXCEPTION 'A avaliação deve ser entre 1 e 5.'; END IF;
+
+  host_profile_id := target_group.host_id;
+  IF reviewer_id = host_profile_id THEN RAISE EXCEPTION 'Anfitriões não podem avaliar o próprio grupo.'; END IF;
+
+  -- Check if user is a member
+  SELECT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(target_group.members_list) as member WHERE member->>'id' = reviewer_id::text
+  ) INTO is_member;
+  IF NOT is_member THEN RAISE EXCEPTION 'Apenas membros do grupo podem deixar uma avaliação.'; END IF;
+
+  -- Check if user has already reviewed
+  IF target_group.reviews IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(target_group.reviews) as review WHERE review->>'user_id' = reviewer_id::text
+    ) INTO has_reviewed;
+    IF has_reviewed THEN RAISE EXCEPTION 'Você já avaliou este grupo.'; END IF;
+  END IF;
+
+  -- Create new review object
+  new_review := jsonb_build_object(
+      'id', gen_random_uuid(),
+      'user_id', reviewer_id,
+      'user_name', reviewer_profile.full_name,
+      'user_avatar_url', reviewer_profile.avatar_url,
+      'rating', p_rating,
+      'comment', p_comment,
+      'created_at', now()
+  );
+
+  -- Add review to group's reviews
+  UPDATE public.groups
+  SET reviews = COALESCE(reviews, '[]'::jsonb) || new_review
+  WHERE id = p_group_id;
+
+  -- Recalculate host's average rating
+  SELECT
+    AVG((r->>'rating')::integer),
+    COUNT(*)
+  INTO
+    new_avg,
+    new_count
+  FROM
+    public.groups g,
+    jsonb_array_elements(g.reviews) r
+  WHERE
+    g.host_id = host_profile_id;
+  
+  UPDATE public.profiles
+  SET host_rating_avg = new_avg,
+      host_rating_count = new_count
+  WHERE id = host_profile_id;
+
+END;
+$$;
 
 -- FIM DO SCRIPT DE ATUALIZAÇÃO
 `;
@@ -369,12 +459,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   state text,
   fcm_tokens text[],
   is_profile_private boolean DEFAULT false,
-  is_searchable boolean DEFAULT true
+  is_searchable boolean DEFAULT true,
+  host_rating_avg numeric(2, 1) DEFAULT 0.0,
+  host_rating_count integer DEFAULT 0
 );
 COMMENT ON TABLE public.profiles IS 'Armazena informações públicas do perfil de cada usuário.';
 
 -- 3. CRIAR TABELA DE GRUPOS (GROUPS)
--- ... (sem alterações)
 CREATE TABLE IF NOT EXISTS public.groups (
   id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -390,12 +481,12 @@ CREATE TABLE IF NOT EXISTS public.groups (
   members_list jsonb,
   rules jsonb,
   credentials jsonb,
-  chat_history jsonb
+  chat_history jsonb,
+  reviews jsonb
 );
 COMMENT ON TABLE public.groups IS 'Armazena todos os dados dos grupos de assinatura.';
 
 -- 4. CRIAR TABELA DE TRANSAÇÕES (TRANSACTIONS)
--- ... (sem alterações)
 CREATE TABLE IF NOT EXISTS public.transactions (
   id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -426,7 +517,6 @@ ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
 
--- ... (limpando políticas antigas)
 DROP POLICY IF EXISTS "Allow read access to profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Allow users to insert their own profile." ON public.profiles;
 DROP POLICY IF EXISTS "Allow users to update their own profile." ON public.profiles;
@@ -455,10 +545,7 @@ CREATE POLICY "Users can view their own tickets" ON public.support_tickets FOR S
 CREATE POLICY "Users can create their own tickets" ON public.support_tickets FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update their own tickets" ON public.support_tickets FOR UPDATE USING (auth.uid() = user_id);
 
--- ... (políticas de storage continuam iguais)
-
 -- 7. FUNÇÕES E TRIGGERS
--- ... (handle_new_user, update_updated_at_column para profiles, funções RPC continuam iguais)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -497,7 +584,6 @@ BEFORE UPDATE ON public.profiles
 FOR EACH ROW
 EXECUTE PROCEDURE public.update_updated_at_column();
 
--- Trigger para atualizar 'updated_at' nos tickets
 CREATE OR REPLACE FUNCTION public.update_ticket_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -513,17 +599,58 @@ FOR EACH ROW
 EXECUTE PROCEDURE public.update_ticket_updated_at_column();
 
 -- ADICIONA AS NOVAS FUNÇÕES RPC
--- 7.1. FUNÇÃO PARA BUSCAR GRUPOS PÚBLICOS
 CREATE OR REPLACE FUNCTION public.get_explore_groups()
 RETURNS TABLE (
-  id bigint, created_at timestamptz, name text, price numeric, status text, members smallint, max_members smallint, next_payment_date text, logo text, host_name text, host_id uuid, members_list jsonb, rules jsonb, credentials jsonb, chat_history jsonb
-) LANGUAGE plpgsql SECURITY DEFINER AS $$
+  id bigint,
+  created_at timestamptz,
+  name text,
+  price numeric,
+  status text,
+  members smallint,
+  max_members smallint,
+  next_payment_date text,
+  logo text,
+  host_name text,
+  host_id uuid,
+  members_list jsonb,
+  rules jsonb,
+  credentials jsonb,
+  chat_history jsonb,
+  reviews jsonb,
+  host_rating_avg numeric,
+  host_rating_count integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 BEGIN
-  RETURN QUERY SELECT g.id, g.created_at, g.name, g.price, g.status, g.members, g.max_members, g.next_payment_date, g.logo, g.host_name, g.host_id, g.members_list, g.rules, '{}'::jsonb, '[]'::jsonb FROM public.groups g;
+  RETURN QUERY
+  SELECT
+    g.id,
+    g.created_at,
+    g.name,
+    g.price,
+    g.status,
+    g.members,
+    g.max_members,
+    g.next_payment_date,
+    g.logo,
+    g.host_name,
+    g.host_id,
+    g.members_list,
+    g.rules,
+    '{}'::jsonb, -- credentials
+    '[]'::jsonb,  -- chat_history
+    g.reviews,
+    p.host_rating_avg,
+    p.host_rating_count
+  FROM
+    public.groups g
+  JOIN
+    public.profiles p ON g.host_id = p.id;
 END;
 $$;
 
--- 7.2. FUNÇÃO PARA ENTRAR EM UM GRUPO
 CREATE OR REPLACE FUNCTION public.join_group(group_id_to_join bigint)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -545,7 +672,6 @@ BEGIN
 END;
 $$;
 
--- 7.3. FUNÇÃO PARA ENVIAR MENSAGEM NO CHAT
 CREATE OR REPLACE FUNCTION public.send_group_message(group_id_to_update bigint, new_message jsonb)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -557,6 +683,88 @@ BEGIN
   SELECT EXISTS (SELECT 1 FROM jsonb_array_elements(target_group.members_list) as member WHERE member->>'id' = sender_id::text) INTO is_member;
   IF NOT is_member THEN RAISE EXCEPTION 'Você não é membro deste grupo e não pode enviar mensagens.'; END IF;
   UPDATE public.groups SET chat_history = chat_history || new_message WHERE id = group_id_to_update;
+END;
+$$;
+
+-- FUNÇÃO PARA SUBMETER AVALIAÇÃO
+CREATE OR REPLACE FUNCTION public.submit_review(p_group_id bigint, p_rating integer, p_comment text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  reviewer_id uuid;
+  reviewer_profile public.profiles;
+  target_group public.groups;
+  new_review jsonb;
+  is_member boolean;
+  has_reviewed boolean;
+  host_profile_id uuid;
+  new_avg numeric;
+  new_count integer;
+BEGIN
+  reviewer_id := auth.uid();
+  
+  -- Get reviewer profile and target group
+  SELECT * INTO reviewer_profile FROM public.profiles WHERE id = reviewer_id;
+  SELECT * INTO target_group FROM public.groups WHERE id = p_group_id;
+
+  -- Validations
+  IF reviewer_profile IS NULL THEN RAISE EXCEPTION 'Perfil do usuário não encontrado.'; END IF;
+  IF target_group IS NULL THEN RAISE EXCEPTION 'Grupo não encontrado.'; END IF;
+  IF p_rating < 1 OR p_rating > 5 THEN RAISE EXCEPTION 'A avaliação deve ser entre 1 e 5.'; END IF;
+
+  host_profile_id := target_group.host_id;
+  IF reviewer_id = host_profile_id THEN RAISE EXCEPTION 'Anfitriões não podem avaliar o próprio grupo.'; END IF;
+
+  -- Check if user is a member
+  SELECT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(target_group.members_list) as member WHERE member->>'id' = reviewer_id::text
+  ) INTO is_member;
+  IF NOT is_member THEN RAISE EXCEPTION 'Apenas membros do grupo podem deixar uma avaliação.'; END IF;
+
+  -- Check if user has already reviewed
+  IF target_group.reviews IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(target_group.reviews) as review WHERE review->>'user_id' = reviewer_id::text
+    ) INTO has_reviewed;
+    IF has_reviewed THEN RAISE EXCEPTION 'Você já avaliou este grupo.'; END IF;
+  END IF;
+
+  -- Create new review object
+  new_review := jsonb_build_object(
+      'id', gen_random_uuid(),
+      'user_id', reviewer_id,
+      'user_name', reviewer_profile.full_name,
+      'user_avatar_url', reviewer_profile.avatar_url,
+      'rating', p_rating,
+      'comment', p_comment,
+      'created_at', now()
+  );
+
+  -- Add review to group's reviews
+  UPDATE public.groups
+  SET reviews = COALESCE(reviews, '[]'::jsonb) || new_review
+  WHERE id = p_group_id;
+
+  -- Recalculate host's average rating
+  SELECT
+    AVG((r->>'rating')::integer),
+    COUNT(*)
+  INTO
+    new_avg,
+    new_count
+  FROM
+    public.groups g,
+    jsonb_array_elements(g.reviews) r
+  WHERE
+    g.host_id = host_profile_id;
+  
+  UPDATE public.profiles
+  SET host_rating_avg = new_avg,
+      host_rating_count = new_count
+  WHERE id = host_profile_id;
+
 END;
 $$;
 `;
@@ -583,7 +791,10 @@ RETURNS TABLE (
   members_list jsonb,
   rules jsonb,
   credentials jsonb,
-  chat_history jsonb
+  chat_history jsonb,
+  reviews jsonb,
+  host_rating_avg numeric,
+  host_rating_count integer
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -605,9 +816,14 @@ BEGIN
     g.members_list,
     g.rules,
     '{}'::jsonb, -- Retorna um objeto JSON vazio para credentials
-    '[]'::jsonb  -- Retorna um array JSON vazio para chat_history
+    '[]'::jsonb,  -- Retorna um array JSON vazio para chat_history
+    g.reviews,
+    p.host_rating_avg,
+    p.host_rating_count
   FROM
-    public.groups g;
+    public.groups g
+  JOIN
+    public.profiles p ON g.host_id = p.id;
 END;
 $$;
 

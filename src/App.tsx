@@ -1,94 +1,93 @@
 // FIX: Imported useMemo hook from React to resolve 'Cannot find name useMemo' error.
 import React, { useState, useEffect, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
-import BottomNav from './components/BottomNav';
-import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';
-import { GroupStatus } from './types';
-import { supabase } from './lib/supabaseClient';
+import BottomNav from '../components/BottomNav';
+import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from '../types';
+import { GroupStatus } from '../types';
+import { supabase } from '../lib/supabaseClient';
 import type { Session } from '@supabase/gotrue-js';
-import DevMenu from './components/DevMenu';
-import { messaging, requestPermissionAndToken } from './lib/firebase';
+import DevMenu from '../components/DevMenu';
+import { messaging, requestPermissionAndToken } from '../lib/firebase';
 import { onMessage } from 'firebase/messaging';
-import { SoundProvider } from './contexts/SoundContext';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import ThemeSelectionModal from './components/ThemeSelectionModal';
-import LoadingScreen from './components/LoadingScreen';
-import Toast from './components/Toast';
-import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
-import PwaInstallPrompt from './components/PwaInstallPrompt';
+import { SoundProvider } from '../contexts/SoundContext';
+import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
+import ThemeSelectionModal from '../components/ThemeSelectionModal';
+import LoadingScreen from '../components/LoadingScreen';
+import Toast from '../components/Toast';
+import NotificationPermissionPrompt from '../components/NotificationPermissionPrompt';
+import PwaInstallPrompt from '../components/PwaInstallPrompt';
 
 
 // Lazy load screen components for code splitting
-const AllMyGroupsScreen = lazy(() => import('./components/AllMyGroupsScreen'));
-const HomeScreen = lazy(() => import('./components/HomeScreen'));
-const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
-const WalletScreen = lazy(() => import('./components/WalletScreen'));
-const ExploreScreen = lazy(() => import('./components/ExploreScreen'));
-const GroupDetailScreen = lazy(() => import('./components/GroupDetailScreen'));
-const PaymentScreen = lazy(() => import('./components/PaymentScreen'));
-const SettingsScreen = lazy(() => import('./components/SettingsScreen'));
-const SupportScreen = lazy(() => import('./components/SupportScreen'));
-const EditProfileScreen = lazy(() => import('./components/EditProfileScreen'));
-const NotificationsScreen = lazy(() => import('./components/NotificationsScreen'));
-const SecurityPrivacyScreen = lazy(() => import('./components/SecurityPrivacyScreen'));
-const MyReviewsScreen = lazy(() => import('./components/MyReviewsScreen'));
-const GroupHistoryScreen = lazy(() => import('./components/GroupHistoryScreen'));
-const ChangePasswordScreen = lazy(() => import('./components/ChangePasswordScreen'));
-const ConnectedDevicesScreen = lazy(() => import('./components/ConnectedDevicesScreen'));
-const TwoFactorAuthScreen = lazy(() => import('./components/TwoFactorAuthScreen'));
-const BiometricsScreen = lazy(() => import('./components/BiometricsScreen'));
-const ProfilePrivacyScreen = lazy(() => import('./components/ProfilePrivacyScreen'));
-const PersonalDataScreen = lazy(() => import('./components/PersonalDataScreen'));
-const ActivityHistoryScreen = lazy(() => import('./components/ActivityHistoryScreen'));
-const AccountVerificationScreen = lazy(() => import('./components/AccountVerificationScreen'));
-const PersonalInfoScreen = lazy(() => import('./components/PersonalInfoScreen'));
-const AddressScreen = lazy(() => import('./components/AddressScreen'));
-const DocumentUploadScreen = lazy(() => import('./components/DocumentUploadScreen'));
-const SelfieScreen = lazy(() => import('./components/SelfieScreen'));
-const PhoneVerificationScreen = lazy(() => import('./components/PhoneVerificationScreen'));
-const AddMoneyScreen = lazy(() => import('./components/AddMoneyScreen'));
-const TransferScreen = lazy(() => import('./components/TransferScreen'));
-const TransferConfirmScreen = lazy(() => import('./components/TransferConfirmScreen'));
-const StatementScreen = lazy(() => import('./components/StatementScreen'));
-const WithdrawScreen = lazy(() => import('./components/WithdrawScreen'));
-const AddAmountScreen = lazy(() => import('./components/AddAmountScreen'));
-const CreateGroupScreen = lazy(() => import('./components/CreateGroupScreen'));
-const ConfigureGroupScreen = lazy(() => import('./components/ConfigureGroupScreen'));
-const GroupCredentialsScreen = lazy(() => import('./components/GroupCredentialsScreen'));
-const GroupChatScreen = lazy(() => import('./components/GroupChatScreen'));
-const MyGroupDetailScreen = lazy(() => import('./components/MyGroupDetailScreen'));
-const WelcomeScreen = lazy(() => import('./components/WelcomeScreen'));
-const LoginScreen = lazy(() => import('./components/LoginScreen'));
-const SignUpScreen = lazy(() => import('./components/SignUpScreen'));
-const ForgotPasswordScreen = lazy(() => import('./components/ForgotPasswordScreen'));
-const UpdatePasswordScreen = lazy(() => import('./components/UpdatePasswordScreen'));
-const SqlSetupScreen = lazy(() => import('./components/SqlSetupScreen'));
-const PaymentSetupScreen = lazy(() => import('./components/PaymentSetupScreen'));
-const EnterPhoneNumberScreen = lazy(() => import('./components/EnterPhoneNumberScreen'));
-const ChangeAvatarScreen = lazy(() => import('./components/ChangeAvatarScreen'));
-const TransferSuccessScreen = lazy(() => import('./components/TransferSuccessScreen'));
-const StatementDetailScreen = lazy(() => import('./components/StatementDetailScreen'));
-const ServiceDetailScreen = lazy(() => import('./components/ServiceDetailScreen'));
-const MovieDetailScreen = lazy(() => import('./components/MovieDetailScreen'));
-const MoviesScreen = lazy(() => import('./components/MoviesScreen'));
-const ProviderDetailScreen = lazy(() => import('./components/ProviderDetailScreen'));
-const NetflixIntro = lazy(() => import('./components/NetflixIntro'));
-const DisneyPlusIntro = lazy(() => import('./components/DisneyPlusIntro'));
-const PrimeVideoIntro = lazy(() => import('./components/PrimeVideoIntro'));
-const MaxIntro = lazy(() => import('./components/MaxIntro'));
-const SoundSettingsScreen = lazy(() => import('./components/SoundSettingsScreen'));
-const NetflixScreen = lazy(() => import('./components/NetflixScreen'));
-const NetflixDetailScreen = lazy(() => import('./components/NetflixDetailScreen'));
-const DisneyPlusScreen = lazy(() => import('./components/DisneyPlusScreen'));
-const DisneyPlusDetailScreen = lazy(() => import('./components/DisneyPlusDetailScreen'));
-const PrimeVideoScreen = lazy(() => import('./components/PrimeVideoScreen'));
-const PrimeVideoDetailScreen = lazy(() => import('./components/PrimeVideoDetailScreen'));
-const MaxScreen = lazy(() => import('./components/MaxScreen'));
-const MaxDetailScreen = lazy(() => import('./components/MaxDetailScreen'));
-const BrandDetailScreen = lazy(() => import('./components/BrandDetailScreen'));
-const AdminScreen = lazy(() => import('./components/AdminScreen'));
-const TermsOfUseScreen = lazy(() => import('./components/TermsOfUseScreen'));
-const DesignSettingsScreen = lazy(() => import('./components/DesignSettingsScreen'));
-const PrivacyPolicyScreen = lazy(() => import('./components/PrivacyPolicyScreen'));
+const AllMyGroupsScreen = lazy(() => import('../components/AllMyGroupsScreen'));
+const HomeScreen = lazy(() => import('../components/HomeScreen'));
+const ProfileScreen = lazy(() => import('../components/ProfileScreen'));
+const WalletScreen = lazy(() => import('../components/WalletScreen'));
+const ExploreScreen = lazy(() => import('../components/ExploreScreen'));
+const GroupDetailScreen = lazy(() => import('../components/GroupDetailScreen'));
+const PaymentScreen = lazy(() => import('../components/PaymentScreen'));
+const SettingsScreen = lazy(() => import('../components/SettingsScreen'));
+const SupportScreen = lazy(() => import('../components/SupportScreen'));
+const EditProfileScreen = lazy(() => import('../components/EditProfileScreen'));
+const NotificationsScreen = lazy(() => import('../components/NotificationsScreen'));
+const SecurityPrivacyScreen = lazy(() => import('../components/SecurityPrivacyScreen'));
+const MyReviewsScreen = lazy(() => import('../components/MyReviewsScreen'));
+const GroupHistoryScreen = lazy(() => import('../components/GroupHistoryScreen'));
+const ChangePasswordScreen = lazy(() => import('../components/ChangePasswordScreen'));
+const ConnectedDevicesScreen = lazy(() => import('../components/ConnectedDevicesScreen'));
+const TwoFactorAuthScreen = lazy(() => import('../components/TwoFactorAuthScreen'));
+const BiometricsScreen = lazy(() => import('../components/BiometricsScreen'));
+const ProfilePrivacyScreen = lazy(() => import('../components/ProfilePrivacyScreen'));
+const PersonalDataScreen = lazy(() => import('../components/PersonalDataScreen'));
+const ActivityHistoryScreen = lazy(() => import('../components/ActivityHistoryScreen'));
+const AccountVerificationScreen = lazy(() => import('../components/AccountVerificationScreen'));
+const PersonalInfoScreen = lazy(() => import('../components/PersonalInfoScreen'));
+const AddressScreen = lazy(() => import('../components/AddressScreen'));
+const DocumentUploadScreen = lazy(() => import('../components/DocumentUploadScreen'));
+const SelfieScreen = lazy(() => import('../components/SelfieScreen'));
+const PhoneVerificationScreen = lazy(() => import('../components/PhoneVerificationScreen'));
+const AddMoneyScreen = lazy(() => import('../components/AddMoneyScreen'));
+const TransferScreen = lazy(() => import('../components/TransferScreen'));
+const TransferConfirmScreen = lazy(() => import('../components/TransferConfirmScreen'));
+const StatementScreen = lazy(() => import('../components/StatementScreen'));
+const WithdrawScreen = lazy(() => import('../components/WithdrawScreen'));
+const AddAmountScreen = lazy(() => import('../components/AddAmountScreen'));
+const CreateGroupScreen = lazy(() => import('../components/CreateGroupScreen'));
+const ConfigureGroupScreen = lazy(() => import('../components/ConfigureGroupScreen'));
+const GroupCredentialsScreen = lazy(() => import('../components/GroupCredentialsScreen'));
+const GroupChatScreen = lazy(() => import('../components/GroupChatScreen'));
+const MyGroupDetailScreen = lazy(() => import('../components/MyGroupDetailScreen'));
+const WelcomeScreen = lazy(() => import('../components/WelcomeScreen'));
+const LoginScreen = lazy(() => import('../components/LoginScreen'));
+const SignUpScreen = lazy(() => import('../components/SignUpScreen'));
+const ForgotPasswordScreen = lazy(() => import('../components/ForgotPasswordScreen'));
+const UpdatePasswordScreen = lazy(() => import('../components/UpdatePasswordScreen'));
+const SqlSetupScreen = lazy(() => import('../components/SqlSetupScreen'));
+const PaymentSetupScreen = lazy(() => import('../components/PaymentSetupScreen'));
+const EnterPhoneNumberScreen = lazy(() => import('../components/EnterPhoneNumberScreen'));
+const ChangeAvatarScreen = lazy(() => import('../components/ChangeAvatarScreen'));
+const TransferSuccessScreen = lazy(() => import('../components/TransferSuccessScreen'));
+const StatementDetailScreen = lazy(() => import('../components/StatementDetailScreen'));
+const ServiceDetailScreen = lazy(() => import('../components/ServiceDetailScreen'));
+const MovieDetailScreen = lazy(() => import('../components/MovieDetailScreen'));
+const MoviesScreen = lazy(() => import('../components/MoviesScreen'));
+const ProviderDetailScreen = lazy(() => import('../components/ProviderDetailScreen'));
+const NetflixIntro = lazy(() => import('../components/NetflixIntro'));
+const DisneyPlusIntro = lazy(() => import('../components/DisneyPlusIntro'));
+const PrimeVideoIntro = lazy(() => import('../components/PrimeVideoIntro'));
+const MaxIntro = lazy(() => import('../components/MaxIntro'));
+const SoundSettingsScreen = lazy(() => import('../components/SoundSettingsScreen'));
+const NetflixScreen = lazy(() => import('../components/NetflixScreen'));
+const NetflixDetailScreen = lazy(() => import('../components/NetflixDetailScreen'));
+const DisneyPlusScreen = lazy(() => import('../components/DisneyPlusScreen'));
+const DisneyPlusDetailScreen = lazy(() => import('../components/DisneyPlusDetailScreen'));
+const PrimeVideoScreen = lazy(() => import('../components/PrimeVideoScreen'));
+const PrimeVideoDetailScreen = lazy(() => import('../components/PrimeVideoDetailScreen'));
+const MaxScreen = lazy(() => import('../components/MaxScreen'));
+const MaxDetailScreen = lazy(() => import('../components/MaxDetailScreen'));
+const BrandDetailScreen = lazy(() => import('../components/BrandDetailScreen'));
+const AdminScreen = lazy(() => import('../components/AdminScreen'));
+const TermsOfUseScreen = lazy(() => import('../components/TermsOfUseScreen'));
+const DesignSettingsScreen = lazy(() => import('../components/DesignSettingsScreen'));
 
 
 interface TMDBMovie {
@@ -110,8 +109,7 @@ export type ProfileView =
   'twoFactorAuth' | 'biometrics' | 'changePassword' | 'connectedDevices' | 
   'profilePrivacy' | 'personalData' | 'activityHistory' |
   'accountVerification' | 'personalInfo' | 'address' | 'documentUpload' | 'selfie' | 
-  'enterPhoneNumber' | 'phoneVerification' | 'changeAvatar' | 'soundSettings' | 'designSettings' |
-  'termsOfUse' | 'privacyPolicy';
+  'enterPhoneNumber' | 'phoneVerification' | 'changeAvatar' | 'soundSettings' | 'designSettings';
 
 export type WalletView = 'main' | 'addAmount' | 'addMoney' | 'transfer' | 'transferConfirm' | 'statement' | 'withdraw' | 'transferSuccess' | 'statementDetail';
 export type ExploreView = 'main' | 'createGroup' | 'configureGroup' | 'groupCredentials';
@@ -385,16 +383,16 @@ const AppContent: React.FC = () => {
 
       setProfile(profileData as Profile);
 
-      const { data: groupsData, error: groupsError } = await supabase
-        .from('groups')
-        .select('*')
-        .order('id', { ascending: false });
+      const { data: groupsData, error: groupsError } = await supabase.rpc('get_explore_groups');
 
       if (groupsError) throw groupsError;
       if (groupsData) {
         const allGroups = groupsData as Group[];
-        setExploreGroups(allGroups);
-        setMyGroups(allGroups);
+        const userGroups = allGroups.filter(g => profileData && g.members_list.some(m => m.id === profileData.id));
+        const otherGroups = allGroups.filter(g => profileData && !g.members_list.some(m => m.id === profileData.id));
+
+        setMyGroups(userGroups);
+        setExploreGroups(otherGroups);
       }
     } catch (error) {
       const typedError = error as { message: string };
@@ -859,13 +857,31 @@ const AppContent: React.FC = () => {
         }
     };
     
+    const handleSubmitReview = async (groupId: number, rating: number, comment: string) => {
+        if (!profile) return;
+
+        const { error } = await supabase.rpc('submit_review', {
+            p_group_id: groupId,
+            p_rating: rating,
+            p_comment: comment
+        });
+
+        if (error) {
+            alert("Erro ao enviar avaliação: " + error.message);
+        } else {
+            alert("Avaliação enviada com sucesso!");
+            // Re-fetch user data to get updated group and profile info
+            fetchUserData();
+        }
+    };
+
     const handleSelectExploreItem = async (item: ExploreDetailItem) => {
         if (item.type === 'movie') {
             setLoading(true);
             setSelectedExploreItem(null);
             setSelectedMovie(null);
             try {
-                const { TMDB_BASE_URL, TMDB_API_KEY, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS, AVAILABLE_SERVICES_DATA } = await import('./constants');
+                const { TMDB_BASE_URL, TMDB_API_KEY, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS, AVAILABLE_SERVICES_DATA } = await import('../constants');
                 const response = await fetch(`${TMDB_BASE_URL}/movie/${item.id}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=watch/providers`);
                 if (!response.ok) throw new Error("Filme não encontrado.");
                 const data = await response.json();
@@ -926,7 +942,7 @@ const AppContent: React.FC = () => {
             };
 
             if (item.type === 'service') {
-                const { AVAILABLE_SERVICES_DATA } = await import('./constants');
+                const { AVAILABLE_SERVICES_DATA } = await import('../constants');
                 const service = AVAILABLE_SERVICES_DATA.find(s => s.id === item.id);
                 if (service) {
                     const serviceId = service.id.toLowerCase();
@@ -958,7 +974,7 @@ const AppContent: React.FC = () => {
 
         setLoading(true);
         try {
-            const { TMDB_BASE_URL, TMDB_API_KEY } = await import('./constants');
+            const { TMDB_BASE_URL, TMDB_API_KEY } = await import('../constants');
             const response = await fetch(`${TMDB_BASE_URL}/movie/${item.id}?api_key=${TMDB_API_KEY}&language=pt-BR`);
             if (!response.ok) throw new Error("Filme não encontrado.");
             const data = await response.json();
@@ -1043,8 +1059,9 @@ const AppContent: React.FC = () => {
     setSelectedMyGroup(null);
   };
 
+  // FIX: Added handleSendMessage function to handle sending chat messages in groups.
   const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
-    const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
+    const targetGroup = allGroups.find(g => g.id === groupId);
     if (!targetGroup) return;
 
     // Call the RPC function to send the message.
@@ -1060,8 +1077,11 @@ const AppContent: React.FC = () => {
         // Optimistically update the UI
         const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
         const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
+        
+        // Update both myGroups and exploreGroups to keep state consistent
         setMyGroups(prev => updateGroupState(prev));
         setExploreGroups(prev => updateGroupState(prev));
+
         if (activeChatGroup?.id === groupId) {
             setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
         }
@@ -1150,50 +1170,6 @@ const AppContent: React.FC = () => {
             setProfile(updatedData as Profile);
             setVerificationSuccessMessage('Endereço salvo com sucesso!');
             setProfileView('accountVerification');
-        }
-    };
-
-    const handleSavePrivacySettings = async (updates: { is_profile_private?: boolean; is_searchable?: boolean; }) => {
-        if (!profile) return;
-        const { data, error } = await supabase.from('profiles').update(updates).eq('id', profile.id).select().single();
-        if (error) {
-            alert('Erro ao salvar configurações: ' + error.message);
-        } else {
-            setProfile(data as Profile);
-            alert('Configurações de privacidade salvas!');
-            handleBackToSecurity();
-        }
-    };
-
-    const handleDownloadData = () => {
-        if (!profile) return;
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(profile, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `dados_gsb_${profile.id}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-        alert('O download dos seus dados foi iniciado.');
-    };
-
-    const handleDeleteAccount = () => {
-        if (!profile || !session) return;
-        const confirmation = window.confirm("Isso abrirá um ticket de suporte para solicitar a exclusão permanente da sua conta, de acordo com nossos Termos de Uso. Deseja continuar?");
-        if (confirmation) {
-            const createTicket = async () => {
-                const subject = `[EXCLUSÃO DE CONTA] Solicitação para ${profile.full_name}`;
-                const messageText = `Eu, ${profile.full_name}, portador do e-mail ${session?.user.email}, solicito a exclusão permanente da minha conta e de todos os meus dados associados, de acordo com os termos de uso.`;
-                const initialMessage = { sender_id: profile.id, sender_name: 'user', text: messageText, timestamp: new Date().toISOString() };
-                const { error } = await supabase.from('support_tickets').insert({ user_id: profile.id, subject, messages: [initialMessage], status: 'aberto' });
-                if (error) {
-                    alert('Erro ao criar solicitação: ' + error.message);
-                } else {
-                    alert('Sua solicitação de exclusão foi enviada. Nossa equipe entrará em contato em breve através da Central de Ajuda.');
-                    handleNavigateProfile('support');
-                }
-            };
-            createTicket();
         }
     };
 
@@ -1489,12 +1465,7 @@ const AppContent: React.FC = () => {
           case 'support':
             return <SupportScreen onBack={goBack} />;
           case 'settings':
-            return <SettingsScreen 
-                onBack={goBack} 
-                onNavigate={handleNavigateProfile}
-                profile={profile} 
-                email={session?.user?.email}
-            />;
+            return <SettingsScreen onBack={goBack} onNavigateToSupport={() => handleNavigateProfile('support')} />;
           case 'notifications':
             return <NotificationsScreen onBack={goBack} />;
           case 'security':
@@ -1509,7 +1480,7 @@ const AppContent: React.FC = () => {
               onNavigateToActivityHistory={() => handleNavigateProfile('activityHistory')}
             />;
           case 'reviews':
-            return <MyReviewsScreen onBack={goBack} />;
+            return <MyReviewsScreen onBack={goBack} allGroups={allGroups} profile={profile} onSubmitReview={handleSubmitReview} />;
           case 'history':
             return <GroupHistoryScreen onBack={goBack} groups={myGroups} />;
           case 'twoFactorAuth':
@@ -1517,23 +1488,22 @@ const AppContent: React.FC = () => {
           case 'biometrics':
             return <BiometricsScreen onBack={goBack} />;
           case 'changePassword':
-            return <ChangePasswordScreen onBack={goBack} onPasswordUpdated={handleBackToSecurity} />;
+            return <ChangePasswordScreen onBack={goBack} onPasswordUpdated={() => {
+              alert('Senha atualizada com sucesso!');
+              handleBackToSecurity();
+            }} />;
           case 'connectedDevices':
             return <ConnectedDevicesScreen onBack={goBack} />;
           case 'profilePrivacy':
-            return <ProfilePrivacyScreen onBack={goBack} profile={profile} onSave={handleSavePrivacySettings} />;
+            return <ProfilePrivacyScreen onBack={goBack} profile={profile} onSave={() => {}} />;
           case 'personalData':
-            return <PersonalDataScreen onBack={goBack} onDownload={handleDownloadData} onDelete={handleDeleteAccount} />;
+            return <PersonalDataScreen onBack={goBack} onDelete={() => {}} onDownload={() => {}} />;
           case 'activityHistory':
             return <ActivityHistoryScreen onBack={goBack} profile={profile} />;
           case 'soundSettings':
             return <SoundSettingsScreen onBack={goBack} />;
           case 'designSettings':
             return <DesignSettingsScreen onBack={goBack} />;
-          case 'termsOfUse':
-            return <TermsOfUseScreen onBack={goBack} />;
-          case 'privacyPolicy':
-            return <PrivacyPolicyScreen onBack={goBack} />;
           case 'accountVerification':
             return <AccountVerificationScreen 
               profile={profile}

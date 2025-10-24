@@ -14,6 +14,16 @@ export interface ChatMessage {
   isYou: boolean;
 }
 
+export interface Review {
+  id: string; // uuid
+  user_id: string;
+  user_name: string;
+  user_avatar_url: string;
+  rating: number; // 1-5
+  comment: string;
+  created_at: string;
+}
+
 export interface Profile {
   id: string; // uuid
   full_name: string;
@@ -34,6 +44,10 @@ export interface Profile {
   state?: string;
   created_at?: string;
   fcm_tokens?: string[];
+  is_profile_private?: boolean;
+  is_searchable?: boolean;
+  host_rating_avg?: number;
+  host_rating_count?: number;
 }
 
 export interface Group {
@@ -54,6 +68,7 @@ export interface Group {
     password?: string;
   };
   host_id?: string;
+  reviews?: Review[];
 }
 
 export interface Activity {

@@ -203,27 +203,6 @@ export const WALLET_TRANSACTIONS_DATA: WalletTransaction[] = [
   },
 ];
 
-export const MY_REVIEWS_DATA = [
-    {
-        id: 1,
-        serviceName: 'Netflix Premium',
-        hostName: 'Maria Silva',
-        date: '20/12/2023',
-        rating: 5,
-        review: 'Excelente anfitriã, sempre muito atenciosa e organizada. O acesso foi liberado rapidamente. Recomendo a todos!',
-        logo: 'https://img.icons8.com/color/96/netflix.png',
-    },
-    {
-        id: 2,
-        serviceName: 'Spotify Premium',
-        hostName: 'Carlos Lima',
-        date: '15/11/2023',
-        rating: 4,
-        review: 'Grupo bom, tudo funcionou como o esperado. Apenas um pequeno atraso para receber o convite, mas nada que atrapalhasse.',
-        logo: 'https://img.icons8.com/color/96/spotify.png',
-    }
-];
-
 export const GROUP_HISTORY_DATA = [
     {
         id: 1,
