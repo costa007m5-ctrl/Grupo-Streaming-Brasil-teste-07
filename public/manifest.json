@@ -36,43 +36,7 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "https://i.ibb.co/L8dYV3m/screenshot-narrow-1.png",
-      "sizes": "1080x2340",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Tela Inicial com seu saldo e grupos."
-    },
-    {
-      "src": "https://i.ibb.co/h1WqNfN/screenshot-narrow-2.png",
-      "sizes": "1080x2340",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Explore grupos de diversos serviços de streaming."
-    },
-    {
-      "src": "https://i.ibb.co/z5YV3Yh/screenshot-narrow-3.png",
-      "sizes": "1080x2340",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Gerencie sua carteira digital com facilidade."
-    },
-    {
-      "src": "https://i.ibb.co/yQJk7zW/screenshot-wide-1.png",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Visão ampla da tela de exploração de filmes."
-    },
-    {
-      "src": "https://i.ibb.co/hXq03nC/screenshot-wide-2.png",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Detalhes de um grupo em tela cheia."
-    }
-  ],
+  "screenshots": [],
   "shortcuts": [
     {
       "name": "Explorar Grupos",
