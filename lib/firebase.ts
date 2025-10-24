@@ -22,10 +22,10 @@ const VAPID_KEY = 'BCPd6alYmTLBqQ91QgJhsmFQSl4sSK0JcZ2LRh0aLyi7eDuP5C9PKAX4-6-mJ
 /**
  * Solicita permissão de notificação e recupera o token FCM.
  */
-export async function requestPermissionAndToken() {
+export async function requestPermissionAndToken(): Promise<string | null> {
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
     console.warn("Este navegador não suporta notificações push.");
-    return;
+    return null;
   }
   
   try {
@@ -38,11 +38,14 @@ export async function requestPermissionAndToken() {
           serviceWorkerRegistration: registration 
       });
       console.log("✅ Token FCM obtido:", token);
+      return token;
     } else {
       console.warn("🚫 Permissão de notificações negada.");
       sessionStorage.setItem('notification_prompt_dismissed', 'true');
+      return null;
     }
   } catch (error) {
     console.error("❌ Erro ao solicitar permissão ou obter token FCM:", error);
+    return null;
   }
 }

@@ -404,19 +404,49 @@ const AppContent: React.FC = () => {
     }
   }, [session]);
 
+  const getAndSavePushToken = async () => {
+    if (!profile) return;
+
+    const token = await requestPermissionAndToken();
+    if (token) {
+      try {
+        const { data: currentProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('fcm_tokens')
+          .eq('id', profile.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        const currentTokens = currentProfile?.fcm_tokens || [];
+        if (!currentTokens.includes(token)) {
+          const newTokens = [...new Set([...currentTokens, token])];
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ fcm_tokens: newTokens })
+            .eq('id', profile.id);
+
+          if (updateError) throw updateError;
+          console.log("✅ Token FCM salvo no perfil.");
+        } else {
+          console.log("ℹ️ Token FCM já existe no perfil.");
+        }
+      } catch (error) {
+        console.error("Erro ao salvar token FCM:", error);
+      }
+    }
+  };
+
   // Setup notifications
   useEffect(() => {
-    if (!session) {
+    if (!session || !profile) {
         return;
     }
     
     if ('Notification' in window) {
         if (Notification.permission === 'granted') {
-            // If permission is already granted, we can get the token.
-            // requestPermissionAndToken will handle this without showing a prompt.
-            requestPermissionAndToken();
+            getAndSavePushToken();
         } else if (Notification.permission === 'default') {
-             // If permission is not yet asked, we show our custom prompt.
              const hasDismissed = sessionStorage.getItem('notification_prompt_dismissed');
              if (!hasDismissed) {
                  setShowNotificationPrompt(true);
@@ -440,7 +470,7 @@ const AppContent: React.FC = () => {
     return () => {
         unsubscribe();
     };
-  }, [session]);
+  }, [session, profile]);
 
   // Setup Periodic Background Sync
   useEffect(() => {
@@ -478,7 +508,7 @@ const AppContent: React.FC = () => {
 
   const handleAllowNotifications = async () => {
       setShowNotificationPrompt(false);
-      await requestPermissionAndToken();
+      await getAndSavePushToken();
   };
 
   const handleDismissNotificationPrompt = () => {

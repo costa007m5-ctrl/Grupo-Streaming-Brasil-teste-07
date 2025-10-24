@@ -33,6 +33,7 @@ export interface Profile {
   city?: string;
   state?: string;
   created_at?: string;
+  fcm_tokens?: string[];
 }
 
 export interface Group {
