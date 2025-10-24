@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeftIcon, DocumentDuplicateIcon } from '../components/Icons';
+import { ArrowLeftIcon, DocumentDuplicateIcon } from './Icons';
 
 const Header: React.FC<{ onBack: () => void; }> = ({ onBack }) => (
     <header className="sticky top-0 bg-white/80 backdrop-blur-sm z-10 p-4">
@@ -262,4 +262,97 @@ const PaymentSetupScreen: React.FC<PaymentSetupScreenProps> = ({ onBack, onSaveV
     };
     
     const handleSaveAndCheck = (url: string) => {
-        const formattedUrl = url.trim
+        const formattedUrl = url.trim().replace(/\/$/, '');
+        onSaveVercelUrl(formattedUrl);
+        if(formattedUrl) {
+            checkMpStatus(formattedUrl);
+        } else {
+            setMpStatus('idle');
+        }
+    };
+
+    const StatusIndicator: React.FC = () => {
+        switch(mpStatus) {
+            case 'checking':
+                return (
+                    <div className="flex items-center space-x-2 text-gray-600">
+                        <div className="w-4 h-4 border-2 border-dashed rounded-full animate-spin border-gray-500"></div>
+                        <span>Verificando conexão...</span>
+                    </div>
+                );
+            case 'configured':
+                return <p className="font-semibold text-green-600">✅ Conectado com sucesso!</p>;
+            case 'unconfigured':
+                return <p className="font-semibold text-yellow-600">⚠️ Token do Mercado Pago não configurado na Vercel.</p>;
+            case 'error':
+                 return <p className="font-semibold text-red-600">❌ Falha na conexão. Verifique a URL, a API e a configuração de CORS (passo 4).</p>;
+            case 'idle':
+            default:
+                return <p className="text-gray-500">Salve a URL para verificar o status.</p>;
+        }
+    };
+
+
+    return (
+        <div className="bg-gray-100 min-h-screen">
+            <Header onBack={onBack} />
+            <main className="p-4 pt-2 space-y-4">
+                 <div className="bg-white p-4 rounded-xl shadow-sm space-y-3">
+                    <h2 className="text-lg font-bold text-gray-800">1. URL da sua Vercel API</h2>
+                    <p className="text-sm text-gray-600">
+                      Após implantar o backend na Vercel, cole a URL base da sua aplicação aqui. (Ex: https://meu-app.vercel.app)
+                    </p>
+                    <div className="flex space-x-2">
+                      <input 
+                        type="text" 
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        placeholder="https://seu-projeto.vercel.app"
+                        className="flex-grow bg-gray-100 border-gray-200 rounded-lg p-3 text-gray-800 focus:ring-2 focus:ring-purple-500"
+                      />
+                      <button onClick={() => handleSaveAndCheck(urlInput)} className="bg-purple-600 text-white font-semibold px-4 rounded-lg hover:bg-purple-700 transition-colors">
+                        Salvar
+                      </button>
+                    </div>
+                    <div className="pt-2 text-sm">
+                        <StatusIndicator />
+                    </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl shadow-sm space-y-3">
+                    <h2 className="text-lg font-bold text-gray-800">2. Variável de Ambiente na Vercel (Mercado Pago)</h2>
+                    <p className="text-sm text-gray-600">
+                        Para a API funcionar, configure sua chave do Mercado Pago no seu projeto Vercel:
+                    </p>
+                    <ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
+                        <li>Acesse o painel do seu projeto na Vercel.</li>
+                        <li>Vá para a aba <strong>Settings</strong> e depois <strong>Environment Variables</strong>.</li>
+                        <li>Crie uma nova variável com o nome <code className="bg-gray-200 text-gray-700 px-1 py-0.5 rounded-md">MP_ACCESS_TOKEN</code>.</li>
+                        <li>Cole sua chave de acesso (que começa com <code className="bg-gray-200 text-gray-700 px-1 py-0.5 rounded-md">APP_USR-...</code>) no campo do valor.</li>
+                        <li>Salve e faça um novo "deploy" do seu projeto para aplicar as alterações.</li>
+                    </ol>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl shadow-sm space-y-3">
+                    <h2 className="text-lg font-bold text-gray-800">3. Variáveis de Ambiente na Vercel (Supabase)</h2>
+                    <p className="text-sm text-gray-600">
+                        Para que o webhook atualize o saldo do usuário, a API precisa de acesso seguro ao Supabase.
+                    </p>
+                    <ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
+                        <li>No painel do Supabase, vá em <strong>Project Settings</strong> {'>'} <strong>API</strong>.</li>
+                        <li>Copie o <strong>Project URL</strong>. Na Vercel, crie a variável de ambiente <code className="bg-gray-200 text-gray-700 px-1 py-0.5 rounded-md">SUPABASE_URL</code> com este valor.</li>
+                        <li>Na mesma página, encontre a chave <strong className="text-red-600">service_role</strong> (mantenha-a secreta!). Na Vercel, crie a variável <code className="bg-gray-200 text-gray-700 px-1 py-0.5 rounded-md">SUPABASE_SERVICE_ROLE_KEY</code> com este valor.</li>
+                        <li>Faça um novo "deploy" do seu projeto Vercel.</li>
+                    </ol>
+                </div>
+
+                <CodeBlock title="Configuração de CORS" code={CORS_CODE} filename="vercel.json" step={4} path="na raiz do projeto" />
+                <CodeBlock title="API de Pagamento PIX" code={PIX_API_CODE} filename="create-pix.js" step={5} path="/api/" />
+                <CodeBlock title="API de Checkout (Cartão, etc.)" code={PREFERENCE_API_CODE} filename="create-preference.js" step={6} path="/api/" />
+                <CodeBlock title="API de Webhook (Notificações)" code={WEBHOOK_API_CODE} filename="mp-webhook.js" step={7} path="/api/"/>
+            </main>
+        </div>
+    );
+};
+
+export default PaymentSetupScreen;

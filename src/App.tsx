@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import BottomNav from '../components/BottomNav';
-import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';
-import { GroupStatus } from './types';
+import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from '../types';
+import { GroupStatus } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import type { Session } from '@supabase/gotrue-js';
 import DevMenu from '../components/DevMenu';
