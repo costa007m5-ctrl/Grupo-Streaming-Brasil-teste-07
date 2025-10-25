@@ -78,6 +78,7 @@ const ActivityItem: React.FC<{ transaction: WalletTransaction }> = ({ transactio
     );
 };
 
+// FIX: Add profile to props to fetch dynamic data.
 interface ActivityHistoryScreenProps {
     onBack: () => void;
     profile: Profile | null;

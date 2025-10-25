@@ -59,6 +59,7 @@ const SettingsToggleItem: React.FC<{ icon: React.ComponentType<{ className?: str
     </BaseItem>
 );
 
+// FIX: Add profile and onSave to props to satisfy interface and handle state changes.
 interface ProfilePrivacyScreenProps {
     onBack: () => void;
     profile: Profile | null;

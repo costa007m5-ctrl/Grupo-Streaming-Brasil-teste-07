@@ -32,6 +32,7 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
     </div>
 );
 
+// FIX: Add onPasswordUpdated to props to satisfy interface and handle success callback.
 interface ChangePasswordScreenProps {
     onBack: () => void;
     onPasswordUpdated: () => void;

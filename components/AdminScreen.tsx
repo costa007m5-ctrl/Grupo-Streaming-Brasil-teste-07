@@ -321,19 +321,21 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showIns
             if (transactionsRes.error) throw transactionsRes.error;
             if (ticketsRes.error) throw ticketsRes.error;
 
-            setAllUsers(usersRes.data as Profile[]);
+            const usersData = usersRes.data as Profile[];
+            setAllUsers(usersData);
             setAllGroups(groupsRes.data as Group[]);
 
-            const usersMap = new Map(usersRes.data.map(u => [u.id, u.full_name]));
+// FIX: Explicitly type the user map and data arrays to resolve 'unknown' type errors during data transformation.
+            const usersMap = new Map(usersData.map(u => [u.id, u.full_name]));
             const transactionsWithName = (transactionsRes.data as Transaction[]).map(tx => ({...tx, user_full_name: usersMap.get(tx.user_id) || 'Usuário Deletado' }));
             setAllTransactions(transactionsWithName);
 
-            const ticketsWithUsers = (ticketsRes.data as SupportTicket[]).map(t => ({...t, user_full_name: usersMap.get(t.user_id) || 'Usuário Deletado', user_avatar_url: usersRes.data.find(u => u.id === t.user_id)?.avatar_url }));
+            const ticketsWithUsers = (ticketsRes.data as SupportTicket[]).map(t => ({...t, user_full_name: usersMap.get(t.user_id) || 'Usuário Deletado', user_avatar_url: usersData.find(u => u.id === t.user_id)?.avatar_url }));
             setAllTickets(ticketsWithUsers);
             
             // Calculate stats
             const dailyVolume = transactionsWithName.filter(tx => tx.created_at.startsWith(today) && tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-            const newUsersToday = usersRes.data.filter(u => u.created_at?.startsWith(today)).length;
+            const newUsersToday = usersData.filter(u => u.created_at?.startsWith(today)).length;
             
             setStats({
                 dailyVolume,

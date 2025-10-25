@@ -22,6 +22,7 @@ const ActionCard: React.FC<{ icon: React.ComponentType<{className?: string}>, ti
     </button>
 );
 
+// FIX: Add onDownload and onDelete to props to align with parent component's requirements.
 interface PersonalDataScreenProps {
     onBack: () => void;
     onDownload: () => void;

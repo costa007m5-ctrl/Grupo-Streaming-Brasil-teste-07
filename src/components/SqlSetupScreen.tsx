@@ -183,6 +183,7 @@ DROP POLICY IF EXISTS "Allow read access to transactions" ON public.transactions
 CREATE POLICY "Allow read access to transactions" ON public.transactions FOR SELECT TO authenticated USING (auth.uid() = user_id OR auth.uid() = '206cb0fc-ea8b-4823-9aea-bba231edbaf8');
 
 -- 5. NOVA FUNÇÃO RPC PARA BUSCAR GRUPOS PÚBLICOS (Corrige tela Explorar)
+-- FIX: Update get_explore_groups to include host rating by joining with the profiles table.
 CREATE OR REPLACE FUNCTION public.get_explore_groups()
 RETURNS TABLE (
   id bigint,
