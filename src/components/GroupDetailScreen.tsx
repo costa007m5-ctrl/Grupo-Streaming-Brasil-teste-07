@@ -51,6 +51,8 @@ const GroupInfo: React.FC<{ group: Group }> = ({ group }) => {
 
 const GroupHost: React.FC<{ group: Group }> = ({ group }) => {
     const { theme } = useTheme();
+    const { host_name, members_list, host_rating_avg, host_rating_count } = group;
+    const hostAvatar = members_list[0]?.avatarUrl;
     
     return (
         <div className={`space-y-3 p-4 rounded-xl shadow-sm ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
@@ -58,14 +60,14 @@ const GroupHost: React.FC<{ group: Group }> = ({ group }) => {
             <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
                 <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-3">
-                        <img src={group.members_list[0]?.avatarUrl} alt={group.host_name} className="w-12 h-12 rounded-full" />
+                        <img src={hostAvatar} alt={host_name} className="w-12 h-12 rounded-full" />
                         <div>
-                            <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{group.host_name}</p>
-                            {(group.host_rating_count ?? 0) > 0 && (
+                            <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{host_name}</p>
+                            {(host_rating_count ?? 0) > 0 && (
                                 <div className="flex items-center space-x-1 mt-0.5">
                                     <StarIcon className="w-4 h-4 text-yellow-400" solid />
-                                    <span className={`font-bold text-sm ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{group.host_rating_avg?.toFixed(1)}</span>
-                                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>({group.host_rating_count} avaliações)</span>
+                                    <span className={`font-bold text-sm ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{host_rating_avg?.toFixed(1)}</span>
+                                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>({host_rating_count} avaliações)</span>
                                 </div>
                             )}
                         </div>

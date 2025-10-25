@@ -1,93 +1,93 @@
 // FIX: Imported useMemo hook from React to resolve 'Cannot find name useMemo' error.
 import React, { useState, useEffect, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
-import BottomNav from '../components/BottomNav';
-import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from '../types';
-import { GroupStatus } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import BottomNav from './components/BottomNav';
+import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';
+import { GroupStatus } from './types';
+import { supabase } from './lib/supabaseClient';
 import type { Session } from '@supabase/gotrue-js';
-import DevMenu from '../components/DevMenu';
-import { messaging, requestPermissionAndToken } from '../lib/firebase';
+import DevMenu from './components/DevMenu';
+import { messaging, requestPermissionAndToken } from './lib/firebase';
 import { onMessage } from 'firebase/messaging';
-import { SoundProvider } from '../contexts/SoundContext';
-import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
-import ThemeSelectionModal from '../components/ThemeSelectionModal';
-import LoadingScreen from '../components/LoadingScreen';
-import Toast from '../components/Toast';
-import NotificationPermissionPrompt from '../components/NotificationPermissionPrompt';
-import PwaInstallPrompt from '../components/PwaInstallPrompt';
+import { SoundProvider } from './contexts/SoundContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import ThemeSelectionModal from './components/ThemeSelectionModal';
+import LoadingScreen from './components/LoadingScreen';
+import Toast from './components/Toast';
+import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 
 // Lazy load screen components for code splitting
-const AllMyGroupsScreen = lazy(() => import('../components/AllMyGroupsScreen'));
-const HomeScreen = lazy(() => import('../components/HomeScreen'));
-const ProfileScreen = lazy(() => import('../components/ProfileScreen'));
-const WalletScreen = lazy(() => import('../components/WalletScreen'));
-const ExploreScreen = lazy(() => import('../components/ExploreScreen'));
-const GroupDetailScreen = lazy(() => import('../components/GroupDetailScreen'));
-const PaymentScreen = lazy(() => import('../components/PaymentScreen'));
-const SettingsScreen = lazy(() => import('../components/SettingsScreen'));
-const SupportScreen = lazy(() => import('../components/SupportScreen'));
-const EditProfileScreen = lazy(() => import('../components/EditProfileScreen'));
-const NotificationsScreen = lazy(() => import('../components/NotificationsScreen'));
-const SecurityPrivacyScreen = lazy(() => import('../components/SecurityPrivacyScreen'));
-const MyReviewsScreen = lazy(() => import('../components/MyReviewsScreen'));
-const GroupHistoryScreen = lazy(() => import('../components/GroupHistoryScreen'));
-const ChangePasswordScreen = lazy(() => import('../components/ChangePasswordScreen'));
-const ConnectedDevicesScreen = lazy(() => import('../components/ConnectedDevicesScreen'));
-const TwoFactorAuthScreen = lazy(() => import('../components/TwoFactorAuthScreen'));
-const BiometricsScreen = lazy(() => import('../components/BiometricsScreen'));
-const ProfilePrivacyScreen = lazy(() => import('../components/ProfilePrivacyScreen'));
-const PersonalDataScreen = lazy(() => import('../components/PersonalDataScreen'));
-const ActivityHistoryScreen = lazy(() => import('../components/ActivityHistoryScreen'));
-const AccountVerificationScreen = lazy(() => import('../components/AccountVerificationScreen'));
-const PersonalInfoScreen = lazy(() => import('../components/PersonalInfoScreen'));
-const AddressScreen = lazy(() => import('../components/AddressScreen'));
-const DocumentUploadScreen = lazy(() => import('../components/DocumentUploadScreen'));
-const SelfieScreen = lazy(() => import('../components/SelfieScreen'));
-const PhoneVerificationScreen = lazy(() => import('../components/PhoneVerificationScreen'));
-const AddMoneyScreen = lazy(() => import('../components/AddMoneyScreen'));
-const TransferScreen = lazy(() => import('../components/TransferScreen'));
-const TransferConfirmScreen = lazy(() => import('../components/TransferConfirmScreen'));
-const StatementScreen = lazy(() => import('../components/StatementScreen'));
-const WithdrawScreen = lazy(() => import('../components/WithdrawScreen'));
-const AddAmountScreen = lazy(() => import('../components/AddAmountScreen'));
-const CreateGroupScreen = lazy(() => import('../components/CreateGroupScreen'));
-const ConfigureGroupScreen = lazy(() => import('../components/ConfigureGroupScreen'));
-const GroupCredentialsScreen = lazy(() => import('../components/GroupCredentialsScreen'));
-const GroupChatScreen = lazy(() => import('../components/GroupChatScreen'));
-const MyGroupDetailScreen = lazy(() => import('../components/MyGroupDetailScreen'));
-const WelcomeScreen = lazy(() => import('../components/WelcomeScreen'));
-const LoginScreen = lazy(() => import('../components/LoginScreen'));
-const SignUpScreen = lazy(() => import('../components/SignUpScreen'));
-const ForgotPasswordScreen = lazy(() => import('../components/ForgotPasswordScreen'));
-const UpdatePasswordScreen = lazy(() => import('../components/UpdatePasswordScreen'));
-const SqlSetupScreen = lazy(() => import('../components/SqlSetupScreen'));
-const PaymentSetupScreen = lazy(() => import('../components/PaymentSetupScreen'));
-const EnterPhoneNumberScreen = lazy(() => import('../components/EnterPhoneNumberScreen'));
-const ChangeAvatarScreen = lazy(() => import('../components/ChangeAvatarScreen'));
-const TransferSuccessScreen = lazy(() => import('../components/TransferSuccessScreen'));
-const StatementDetailScreen = lazy(() => import('../components/StatementDetailScreen'));
-const ServiceDetailScreen = lazy(() => import('../components/ServiceDetailScreen'));
-const MovieDetailScreen = lazy(() => import('../components/MovieDetailScreen'));
-const MoviesScreen = lazy(() => import('../components/MoviesScreen'));
-const ProviderDetailScreen = lazy(() => import('../components/ProviderDetailScreen'));
-const NetflixIntro = lazy(() => import('../components/NetflixIntro'));
-const DisneyPlusIntro = lazy(() => import('../components/DisneyPlusIntro'));
-const PrimeVideoIntro = lazy(() => import('../components/PrimeVideoIntro'));
-const MaxIntro = lazy(() => import('../components/MaxIntro'));
-const SoundSettingsScreen = lazy(() => import('../components/SoundSettingsScreen'));
-const NetflixScreen = lazy(() => import('../components/NetflixScreen'));
-const NetflixDetailScreen = lazy(() => import('../components/NetflixDetailScreen'));
-const DisneyPlusScreen = lazy(() => import('../components/DisneyPlusScreen'));
-const DisneyPlusDetailScreen = lazy(() => import('../components/DisneyPlusDetailScreen'));
-const PrimeVideoScreen = lazy(() => import('../components/PrimeVideoScreen'));
-const PrimeVideoDetailScreen = lazy(() => import('../components/PrimeVideoDetailScreen'));
-const MaxScreen = lazy(() => import('../components/MaxScreen'));
-const MaxDetailScreen = lazy(() => import('../components/MaxDetailScreen'));
-const BrandDetailScreen = lazy(() => import('../components/BrandDetailScreen'));
-const AdminScreen = lazy(() => import('../components/AdminScreen'));
-const TermsOfUseScreen = lazy(() => import('../components/TermsOfUseScreen'));
-const DesignSettingsScreen = lazy(() => import('../components/DesignSettingsScreen'));
+const AllMyGroupsScreen = lazy(() => import('./components/AllMyGroupsScreen'));
+const HomeScreen = lazy(() => import('./components/HomeScreen'));
+const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
+const WalletScreen = lazy(() => import('./components/WalletScreen'));
+const ExploreScreen = lazy(() => import('./components/ExploreScreen'));
+const GroupDetailScreen = lazy(() => import('./components/GroupDetailScreen'));
+const PaymentScreen = lazy(() => import('./components/PaymentScreen'));
+const SettingsScreen = lazy(() => import('./components/SettingsScreen'));
+const SupportScreen = lazy(() => import('./components/SupportScreen'));
+const EditProfileScreen = lazy(() => import('./components/EditProfileScreen'));
+const NotificationsScreen = lazy(() => import('./components/NotificationsScreen'));
+const SecurityPrivacyScreen = lazy(() => import('./components/SecurityPrivacyScreen'));
+const MyReviewsScreen = lazy(() => import('./components/MyReviewsScreen'));
+const GroupHistoryScreen = lazy(() => import('./components/GroupHistoryScreen'));
+const ChangePasswordScreen = lazy(() => import('./components/ChangePasswordScreen'));
+const ConnectedDevicesScreen = lazy(() => import('./components/ConnectedDevicesScreen'));
+const TwoFactorAuthScreen = lazy(() => import('./components/TwoFactorAuthScreen'));
+const BiometricsScreen = lazy(() => import('./components/BiometricsScreen'));
+const ProfilePrivacyScreen = lazy(() => import('./components/ProfilePrivacyScreen'));
+const PersonalDataScreen = lazy(() => import('./components/PersonalDataScreen'));
+const ActivityHistoryScreen = lazy(() => import('./components/ActivityHistoryScreen'));
+const AccountVerificationScreen = lazy(() => import('./components/AccountVerificationScreen'));
+const PersonalInfoScreen = lazy(() => import('./components/PersonalInfoScreen'));
+const AddressScreen = lazy(() => import('./components/AddressScreen'));
+const DocumentUploadScreen = lazy(() => import('./components/DocumentUploadScreen'));
+const SelfieScreen = lazy(() => import('./components/SelfieScreen'));
+const PhoneVerificationScreen = lazy(() => import('./components/PhoneVerificationScreen'));
+const AddMoneyScreen = lazy(() => import('./components/AddMoneyScreen'));
+const TransferScreen = lazy(() => import('./components/TransferScreen'));
+const TransferConfirmScreen = lazy(() => import('./components/TransferConfirmScreen'));
+const StatementScreen = lazy(() => import('./components/StatementScreen'));
+const WithdrawScreen = lazy(() => import('./components/WithdrawScreen'));
+const AddAmountScreen = lazy(() => import('./components/AddAmountScreen'));
+const CreateGroupScreen = lazy(() => import('./components/CreateGroupScreen'));
+const ConfigureGroupScreen = lazy(() => import('./components/ConfigureGroupScreen'));
+const GroupCredentialsScreen = lazy(() => import('./components/GroupCredentialsScreen'));
+const GroupChatScreen = lazy(() => import('./components/GroupChatScreen'));
+const MyGroupDetailScreen = lazy(() => import('./components/MyGroupDetailScreen'));
+const WelcomeScreen = lazy(() => import('./components/WelcomeScreen'));
+const LoginScreen = lazy(() => import('./components/LoginScreen'));
+const SignUpScreen = lazy(() => import('./components/SignUpScreen'));
+const ForgotPasswordScreen = lazy(() => import('./components/ForgotPasswordScreen'));
+const UpdatePasswordScreen = lazy(() => import('./components/UpdatePasswordScreen'));
+const SqlSetupScreen = lazy(() => import('./components/SqlSetupScreen'));
+const PaymentSetupScreen = lazy(() => import('./components/PaymentSetupScreen'));
+const EnterPhoneNumberScreen = lazy(() => import('./components/EnterPhoneNumberScreen'));
+const ChangeAvatarScreen = lazy(() => import('./components/ChangeAvatarScreen'));
+const TransferSuccessScreen = lazy(() => import('./components/TransferSuccessScreen'));
+const StatementDetailScreen = lazy(() => import('./components/StatementDetailScreen'));
+const ServiceDetailScreen = lazy(() => import('./components/ServiceDetailScreen'));
+const MovieDetailScreen = lazy(() => import('./components/MovieDetailScreen'));
+const MoviesScreen = lazy(() => import('./components/MoviesScreen'));
+const ProviderDetailScreen = lazy(() => import('./components/ProviderDetailScreen'));
+const NetflixIntro = lazy(() => import('./components/NetflixIntro'));
+const DisneyPlusIntro = lazy(() => import('./components/DisneyPlusIntro'));
+const PrimeVideoIntro = lazy(() => import('./components/PrimeVideoIntro'));
+const MaxIntro = lazy(() => import('./components/MaxIntro'));
+const SoundSettingsScreen = lazy(() => import('./components/SoundSettingsScreen'));
+const NetflixScreen = lazy(() => import('./components/NetflixScreen'));
+const NetflixDetailScreen = lazy(() => import('./components/NetflixDetailScreen'));
+const DisneyPlusScreen = lazy(() => import('./components/DisneyPlusScreen'));
+const DisneyPlusDetailScreen = lazy(() => import('./components/DisneyPlusDetailScreen'));
+const PrimeVideoScreen = lazy(() => import('./components/PrimeVideoScreen'));
+const PrimeVideoDetailScreen = lazy(() => import('./components/PrimeVideoDetailScreen'));
+const MaxScreen = lazy(() => import('./components/MaxScreen'));
+const MaxDetailScreen = lazy(() => import('./components/MaxDetailScreen'));
+const BrandDetailScreen = lazy(() => import('./components/BrandDetailScreen'));
+const AdminScreen = lazy(() => import('./components/AdminScreen'));
+const TermsOfUseScreen = lazy(() => import('./components/TermsOfUseScreen'));
+const DesignSettingsScreen = lazy(() => import('./components/DesignSettingsScreen'));
 
 
 interface TMDBMovie {
@@ -857,6 +857,31 @@ const AppContent: React.FC = () => {
         }
     };
     
+    const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
+        const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
+        if (!targetGroup) return;
+
+        // Call the RPC function to send the message.
+        // The backend will verify if the user is a member.
+        const { error } = await supabase.rpc('send_group_message', {
+            group_id_to_update: groupId,
+            new_message: newMessage
+        });
+
+        if (error) {
+            alert('Falha ao enviar mensagem: ' + error.message);
+        } else {
+            // Optimistically update the UI
+            const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
+            const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
+            setMyGroups(prev => updateGroupState(prev));
+            setExploreGroups(prev => updateGroupState(prev));
+            if (activeChatGroup?.id === groupId) {
+                setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
+            }
+        }
+    };
+    
     const handleSubmitReview = async (groupId: number, rating: number, comment: string) => {
         if (!profile) return;
 
@@ -881,7 +906,7 @@ const AppContent: React.FC = () => {
             setSelectedExploreItem(null);
             setSelectedMovie(null);
             try {
-                const { TMDB_BASE_URL, TMDB_API_KEY, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS, AVAILABLE_SERVICES_DATA } = await import('../constants');
+                const { TMDB_BASE_URL, TMDB_API_KEY, TMDB_IMAGE_BASE_URL, TMDB_PROVIDER_IDS, AVAILABLE_SERVICES_DATA } = await import('./constants');
                 const response = await fetch(`${TMDB_BASE_URL}/movie/${item.id}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=watch/providers`);
                 if (!response.ok) throw new Error("Filme não encontrado.");
                 const data = await response.json();
@@ -942,7 +967,7 @@ const AppContent: React.FC = () => {
             };
 
             if (item.type === 'service') {
-                const { AVAILABLE_SERVICES_DATA } = await import('../constants');
+                const { AVAILABLE_SERVICES_DATA } = await import('./constants');
                 const service = AVAILABLE_SERVICES_DATA.find(s => s.id === item.id);
                 if (service) {
                     const serviceId = service.id.toLowerCase();
@@ -974,7 +999,7 @@ const AppContent: React.FC = () => {
 
         setLoading(true);
         try {
-            const { TMDB_BASE_URL, TMDB_API_KEY } = await import('../constants');
+            const { TMDB_BASE_URL, TMDB_API_KEY } = await import('./constants');
             const response = await fetch(`${TMDB_BASE_URL}/movie/${item.id}?api_key=${TMDB_API_KEY}&language=pt-BR`);
             if (!response.ok) throw new Error("Filme não encontrado.");
             const data = await response.json();
@@ -1057,35 +1082,6 @@ const AppContent: React.FC = () => {
 
   const handleBackFromMyGroupDetails = () => {
     setSelectedMyGroup(null);
-  };
-
-  // FIX: Added handleSendMessage function to handle sending chat messages in groups.
-  const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
-    const targetGroup = allGroups.find(g => g.id === groupId);
-    if (!targetGroup) return;
-
-    // Call the RPC function to send the message.
-    // The backend will verify if the user is a member.
-    const { error } = await supabase.rpc('send_group_message', {
-        group_id_to_update: groupId,
-        new_message: newMessage
-    });
-
-    if (error) {
-        alert('Falha ao enviar mensagem: ' + error.message);
-    } else {
-        // Optimistically update the UI
-        const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
-        const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
-        
-        // Update both myGroups and exploreGroups to keep state consistent
-        setMyGroups(prev => updateGroupState(prev));
-        setExploreGroups(prev => updateGroupState(prev));
-
-        if (activeChatGroup?.id === groupId) {
-            setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
-        }
-    }
   };
 
   const handleUpdateProfile = async (data: ProfileUpdateData) => {
@@ -1427,7 +1423,7 @@ const AppContent: React.FC = () => {
     if (selectedMovie) {
         return <MovieDetailScreen
           movie={selectedMovie}
-          allGroups={exploreGroups}
+          allGroups={allGroups}
           onBack={goBack}
           onSelectGroup={handleSelectGroup}
           onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })}
@@ -1488,18 +1484,15 @@ const AppContent: React.FC = () => {
           case 'biometrics':
             return <BiometricsScreen onBack={goBack} />;
           case 'changePassword':
-            return <ChangePasswordScreen onBack={goBack} onPasswordUpdated={() => {
-              alert('Senha atualizada com sucesso!');
-              handleBackToSecurity();
-            }} />;
+            return <ChangePasswordScreen onBack={goBack} />;
           case 'connectedDevices':
             return <ConnectedDevicesScreen onBack={goBack} />;
           case 'profilePrivacy':
-            return <ProfilePrivacyScreen onBack={goBack} profile={profile} onSave={() => {}} />;
+            return <ProfilePrivacyScreen onBack={goBack} />;
           case 'personalData':
-            return <PersonalDataScreen onBack={goBack} onDelete={() => {}} onDownload={() => {}} />;
+            return <PersonalDataScreen onBack={goBack} />;
           case 'activityHistory':
-            return <ActivityHistoryScreen onBack={goBack} profile={profile} />;
+            return <ActivityHistoryScreen onBack={goBack} />;
           case 'soundSettings':
             return <SoundSettingsScreen onBack={goBack} />;
           case 'designSettings':
@@ -1577,7 +1570,7 @@ const AppContent: React.FC = () => {
         if (selectedExploreItem) {
             return <ServiceDetailScreen 
                         item={selectedExploreItem}
-                        groups={exploreGroups}
+                        groups={allGroups}
                         onBack={goBack}
                         onSelectGroup={handleSelectGroup}
                         onSelectExploreItem={handleSelectExploreItem}
@@ -1707,7 +1700,7 @@ const AppContent: React.FC = () => {
             onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })} 
             onSelectSeries={(seriesId) => alert(`Detalhes para a série ID ${seriesId} serão adicionados em breve!`)}
             onSelectProvider={handleSelectProvider}
-            allGroups={exploreGroups}
+            allGroups={allGroups}
             onSelectGroup={handleSelectGroup}
         />;
       case 'home':
@@ -1740,8 +1733,7 @@ const AppContent: React.FC = () => {
                 title={notification.title}
                 body={notification.body}
                 onClose={() => setNotification(null)}
-                onClick={handleNotificationToastClick}
-                data={notification.data}
+                onClick={() => handleNotificationToastClick(notification.data)}
             />
         )}
        <ThemeSelectionModal isOpen={isThemeModalOpen} onClose={() => setIsThemeModalOpen(false)} />
