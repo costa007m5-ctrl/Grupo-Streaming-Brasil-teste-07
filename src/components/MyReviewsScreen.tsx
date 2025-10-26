@@ -125,7 +125,8 @@ const MyReviewsScreen: React.FC<MyReviewsScreenProps> = ({ onBack, allGroups, pr
                 console.error("Error fetching transaction history for reviews:", error);
                 setHistoricalGroupIds([]);
             } else if (data) {
-                const groupIds = data.map(tx => tx.metadata?.group_id).filter(id => id != null);
+                // FIX: Added a type guard to ensure that 'id' is a number before it's used, resolving the 'unknown[]' type error.
+                const groupIds: number[] = data.map(tx => tx.metadata?.group_id).filter((id): id is number => id != null && typeof id === 'number');
                 const uniqueGroupIds = [...new Set(groupIds)];
                 setHistoricalGroupIds(uniqueGroupIds);
             }

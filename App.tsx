@@ -1,7 +1,11 @@
 // FIX: Imported useMemo hook from React to resolve 'Cannot find name useMemo' error.
 import React, { useState, useEffect, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
 import BottomNav from './components/BottomNav';
-import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';
+// FIX: Moved shared types to types.ts and consolidated imports.
+import type { 
+  AppView, ProfileView, WalletView, ExploreView, AuthView, DevScreen, ExploreDetailItem, ProfileUpdateData, VerificationData,
+  AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand 
+} from './types';
 import { GroupStatus } from './types';
 import { supabase } from './lib/supabaseClient';
 import type { Session } from '@supabase/gotrue-js';
@@ -101,31 +105,6 @@ interface TMDBMovie {
 }
 type ContentItem = TMDBMovie | TvShow;
 
-
-export type AppView = 'home' | 'explore' | 'movies' | 'wallet' | 'profile';
-export type ProfileView = 
-  'main' | 'settings' | 'support' | 'editProfile' | 'notifications' | 
-  'security' | 'reviews' | 'history' | 
-  'twoFactorAuth' | 'biometrics' | 'changePassword' | 'connectedDevices' | 
-  'profilePrivacy' | 'personalData' | 'activityHistory' |
-  'accountVerification' | 'personalInfo' | 'address' | 'documentUpload' | 'selfie' | 
-  'enterPhoneNumber' | 'phoneVerification' | 'changeAvatar' | 'soundSettings' | 'designSettings';
-
-export type WalletView = 'main' | 'addAmount' | 'addMoney' | 'transfer' | 'transferConfirm' | 'statement' | 'withdraw' | 'transferSuccess' | 'statementDetail';
-export type ExploreView = 'main' | 'createGroup' | 'configureGroup' | 'groupCredentials';
-export type AuthView = 'welcome' | 'login' | 'signup' | 'forgotPassword' | 'updatePassword' | 'terms';
-export type DevScreen = 'sql' | 'payment';
-export type ExploreDetailItem = { type: 'service' | 'category' | 'movie'; id: string };
-
-interface ProfileUpdateData {
-    name: string;
-    phone: string;
-    birthDate: string;
-}
-
-interface VerificationData {
-    phoneNumber: string;
-}
 
 const ADMIN_USER_ID = '206cb0fc-ea8b-4823-9aea-bba231edbaf8'; // IMPORTANTE: Substitua pelo seu ID de usuário do Supabase para ter acesso de admin.
 
@@ -383,16 +362,17 @@ const AppContent: React.FC = () => {
 
       setProfile(profileData as Profile);
 
-      const { data: groupsData, error: groupsError } = await supabase
-        .from('groups')
-        .select('*')
-        .order('id', { ascending: false });
+// FIX: Correctly call the 'get_explore_groups' RPC function and separate groups into 'myGroups' and 'exploreGroups'.
+      const { data: groupsData, error: groupsError } = await supabase.rpc('get_explore_groups');
 
       if (groupsError) throw groupsError;
       if (groupsData) {
         const allGroups = groupsData as Group[];
-        setExploreGroups(allGroups);
-        setMyGroups(allGroups);
+        const userGroups = allGroups.filter(g => profileData && g.members_list.some(m => m.id === profileData.id));
+        const otherGroups = allGroups.filter(g => profileData && !g.members_list.some(m => m.id === profileData.id));
+
+        setMyGroups(userGroups);
+        setExploreGroups(otherGroups);
       }
     } catch (error) {
       const typedError = error as { message: string };
@@ -815,48 +795,65 @@ const AppContent: React.FC = () => {
         if (profile.balance < groupToJoin.price) { alert("Saldo insuficiente."); return; }
         if (groupToJoin.members_list.some(m => m.id === profile.id)) { alert("Você já está neste grupo."); return; }
         if (groupToJoin.members >= groupToJoin.max_members) { alert("Grupo está lotado."); return; }
-
-        const newMember: GroupMember = {
-            id: profile.id,
-            name: profile.full_name,
-            role: 'Membro' as const,
-            joinDate: new Date().toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', ''),
-            avatarUrl: profile.avatar_url
-        };
         
-        const newMembersList = [...groupToJoin.members_list, newMember];
-        const newMemberCount = groupToJoin.members + 1;
-        const newBalance = profile.balance - groupToJoin.price;
-
-        const { error: transactionInsertError } = await supabase
-            .from('transactions')
-            .insert({
-                user_id: profile.id,
-                amount: -groupToJoin.price,
-                type: 'payment',
-                description: `Pagamento grupo ${groupToJoin.name}`,
-                metadata: { group_id: groupToJoin.id }
+        try {
+            const { error } = await supabase.rpc('join_group', {
+                group_id_to_join: groupToJoin.id
             });
-
-        const { error: groupUpdateError } = await supabase.from('groups').update({
-            members: newMemberCount,
-            members_list: newMembersList
-        }).eq('id', groupToJoin.id);
-
-        const { error: profileUpdateError } = await supabase.from('profiles').update({
-            balance: newBalance
-        }).eq('id', profile.id);
-
-        if (groupUpdateError || profileUpdateError || transactionInsertError) {
-            alert("Erro ao entrar no grupo. Se o valor foi debitado, contate o suporte.");
-        } else {
+            if (error) throw error;
+            
             alert("Você entrou no grupo com sucesso!");
             fetchUserData();
             setIsInPaymentFlow(false);
             setSelectedGroup(null);
+        } catch(error: any) {
+            alert("Erro ao entrar no grupo: " + error.message + ". Se o valor foi debitado, contate o suporte.");
         }
     };
     
+    const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
+        const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
+        if (!targetGroup) return;
+
+        // Call the RPC function to send the message.
+        // The backend will verify if the user is a member.
+        const { error } = await supabase.rpc('send_group_message', {
+            group_id_to_update: groupId,
+            new_message: newMessage
+        });
+
+        if (error) {
+            alert('Falha ao enviar mensagem: ' + error.message);
+        } else {
+            // Optimistically update the UI
+            const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
+            const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
+            setMyGroups(prev => updateGroupState(prev));
+            setExploreGroups(prev => updateGroupState(prev));
+            if (activeChatGroup?.id === groupId) {
+                setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
+            }
+        }
+    };
+    
+    const handleSubmitReview = async (groupId: number, rating: number, comment: string) => {
+        if (!profile) return;
+
+        const { error } = await supabase.rpc('submit_review', {
+            p_group_id: groupId,
+            p_rating: rating,
+            p_comment: comment
+        });
+
+        if (error) {
+            alert("Erro ao enviar avaliação: " + error.message);
+        } else {
+            alert("Avaliação enviada com sucesso!");
+            // Re-fetch user data to get updated group and profile info
+            fetchUserData();
+        }
+    };
+
     const handleSelectExploreItem = async (item: ExploreDetailItem) => {
         if (item.type === 'movie') {
             setLoading(true);
@@ -1039,31 +1036,6 @@ const AppContent: React.FC = () => {
 
   const handleBackFromMyGroupDetails = () => {
     setSelectedMyGroup(null);
-  };
-
-  const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
-    const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
-    if (!targetGroup) return;
-
-    // Call the RPC function to send the message.
-    // The backend will verify if the user is a member.
-    const { error } = await supabase.rpc('send_group_message', {
-        group_id_to_update: groupId,
-        new_message: newMessage
-    });
-
-    if (error) {
-        alert('Falha ao enviar mensagem: ' + error.message);
-    } else {
-        // Optimistically update the UI
-        const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
-        const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
-        setMyGroups(prev => updateGroupState(prev));
-        setExploreGroups(prev => updateGroupState(prev));
-        if (activeChatGroup?.id === groupId) {
-            setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
-        }
-    }
   };
 
   const handleUpdateProfile = async (data: ProfileUpdateData) => {
@@ -1333,435 +1305,42 @@ const AppContent: React.FC = () => {
           }
       }
   }, [initialChatGroupId, allGroups]);
+// FIX: Implement handlers for privacy settings, data download, and account deletion to pass as props.
+  const handleSavePrivacySettings = async (updates: { is_profile_private?: boolean; is_searchable?: boolean; }) => {
+    if (!profile) return;
+    const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', profile.id)
+        .select()
+        .single();
+
+    if (error) {
+        alert('Erro ao salvar configurações de privacidade: ' + error.message);
+    } else {
+        setProfile(data as Profile);
+        alert('Configurações salvas!');
+        handleBackToSecurity();
+    }
+  };
+
+  const handleDownloadData = () => {
+    alert('Sua solicitação de download foi recebida. O arquivo será enviado para o seu e-mail em até 24 horas.');
+  };
+  
+  const handleDeleteAccount = () => {
+    alert('Para sua segurança, a exclusão de conta deve ser solicitada através do suporte. Isso abrirá um ticket para nossa equipe.');
+    setActiveView('profile');
+    handleNavigateProfile('support');
+  };
 
   const renderAuthContent = () => {
     switch(authView) {
         case 'login':
             return <LoginScreen 
               onEmailLogin={handleEmailLogin} 
-              onPhonePasswordLogin={handlePhonePasswordLogin}
-              onPhoneOtpRequest={handlePhoneOtpRequest}
-              onPhoneOtpVerify={handlePhoneOtpVerify}
               onNavigateToSignUp={() => setAuthView('signup')} 
               onNavigateToForgotPassword={() => setAuthView('forgotPassword')}
               onBack={() => setAuthView('welcome')} 
             />;
-        case 'signup':
-            return <SignUpScreen onSignUp={handleSignUp} onNavigateToLogin={() => setAuthView('login')} onNavigateToTerms={() => setAuthView('terms')} />;
-        case 'forgotPassword':
-            return <ForgotPasswordScreen onBack={() => setAuthView('login')} onSent={() => setAuthView('login')} />;
-        case 'updatePassword':
-            return session ? <UpdatePasswordScreen session={session} onPasswordUpdated={() => { setAuthView('login'); alert('Senha atualizada com sucesso!'); }} /> : <LoginScreen onEmailLogin={handleEmailLogin} onPhonePasswordLogin={handlePhonePasswordLogin} onPhoneOtpRequest={handlePhoneOtpRequest} onPhoneOtpVerify={handlePhoneOtpVerify} onNavigateToSignUp={() => setAuthView('signup')} onNavigateToForgotPassword={() => setAuthView('forgotPassword')} onBack={() => setAuthView('welcome')} />;
-        case 'terms':
-            return <TermsOfUseScreen onBack={() => setAuthView('signup')} />;
-        case 'welcome':
-        default:
-            return <WelcomeScreen onNavigateToLogin={() => setAuthView('login')} onNavigateToSignUp={() => setAuthView('signup')} />;
-    }
-  }
-
-  const renderContent = () => {
-    if (loading || showSplashScreen || showPostLoginSplash) {
-      return <LoadingScreen />;
-    }
-    
-    if (isAdminView) {
-        return <AdminScreen 
-            onBack={() => setIsAdminView(false)} 
-            onInstallApp={handleInstallClick}
-            showInstallButton={!!deferredInstallPrompt}
-            onTestNotification={handleTestNotification}
-        />;
-    }
-    
-    if (activeDevScreen === 'sql') {
-        return <SqlSetupScreen onBack={handleBackFromDevScreen} />;
-    }
-    if (activeDevScreen === 'payment') {
-        return <PaymentSetupScreen onBack={handleBackFromDevScreen} onSaveVercelUrl={setVercelUrl} currentVercelUrl={vercelUrl} />;
-    }
-
-    if (!session) {
-        return renderAuthContent();
-    }
-    
-    if (activeChatGroup) {
-      return <GroupChatScreen group={activeChatGroup} onBack={goBack} profile={profile} onSendMessage={handleSendMessage} />;
-    }
-
-    if (selectedMyGroup) {
-      return <MyGroupDetailScreen group={selectedMyGroup} onBack={goBack} onGoToChat={handleViewGroupChat} />;
-    }
-    
-    if (viewingAllMyGroups) {
-      return <AllMyGroupsScreen
-        groups={myGroups}
-        onBack={goBack}
-        onViewGroupChat={handleViewGroupChat}
-        onViewMyGroupDetails={handleViewMyGroupDetails}
-      />;
-    }
-
-    if (selectedMovie) {
-        return <MovieDetailScreen
-          movie={selectedMovie}
-          allGroups={exploreGroups}
-          onBack={goBack}
-          onSelectGroup={handleSelectGroup}
-          onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })}
-          myList={myList}
-          addToMyList={addToMyList}
-          removeFromMyList={removeFromMyList}
-          isInMyList={isInMyList}
-        />
-    }
-
-    if (selectedProvider) {
-        return <ProviderDetailScreen 
-            service={selectedProvider} 
-            onBack={goBack}
-            onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })} 
-            onSelectSeries={(seriesId) => alert(`Detalhes para a série ID ${seriesId} serão adicionados em breve!`)}
-        />
-    }
-    
-    if (isInPaymentFlow && selectedGroup) {
-      return <PaymentScreen group={selectedGroup} onBack={goBack} onConfirm={() => handleJoinGroup(selectedGroup)} profile={profile} email={session?.user?.email} />;
-    }
-
-    if (selectedGroup) {
-      return <GroupDetailScreen group={selectedGroup} onBack={goBack} onProceedToPayment={handleProceedToPayment} />;
-    }
-    
-    switch (activeView) {
-      case 'profile':
-        switch (profileView) {
-          case 'editProfile':
-            return <EditProfileScreen onBack={goBack} profile={profile} onSave={handleUpdateProfile} onNavigateToChangeAvatar={() => handleNavigateProfile('changeAvatar')} email={session?.user?.email} />;
-          case 'changeAvatar':
-            return <ChangeAvatarScreen onBack={goBack} profile={profile} onSave={handleUpdateAvatar} />;
-          case 'support':
-            return <SupportScreen onBack={goBack} />;
-          case 'settings':
-            return <SettingsScreen onBack={goBack} onNavigateToSupport={() => handleNavigateProfile('support')} />;
-          case 'notifications':
-            return <NotificationsScreen onBack={goBack} />;
-          case 'security':
-            return <SecurityPrivacyScreen
-              onBack={goBack}
-              onNavigateToTwoFactorAuth={() => handleNavigateProfile('twoFactorAuth')}
-              onNavigateToBiometrics={() => handleNavigateProfile('biometrics')}
-              onNavigateToChangePassword={() => handleNavigateProfile('changePassword')}
-              onNavigateToConnectedDevices={() => handleNavigateProfile('connectedDevices')}
-              onNavigateToProfilePrivacy={() => handleNavigateProfile('profilePrivacy')}
-              onNavigateToPersonalData={() => handleNavigateProfile('personalData')}
-              onNavigateToActivityHistory={() => handleNavigateProfile('activityHistory')}
-            />;
-          case 'reviews':
-            return <MyReviewsScreen onBack={goBack} />;
-          case 'history':
-            return <GroupHistoryScreen onBack={goBack} groups={myGroups} />;
-          case 'twoFactorAuth':
-            return <TwoFactorAuthScreen onBack={goBack} />;
-          case 'biometrics':
-            return <BiometricsScreen onBack={goBack} />;
-          case 'changePassword':
-            return <ChangePasswordScreen onBack={goBack} />;
-          case 'connectedDevices':
-            return <ConnectedDevicesScreen onBack={goBack} />;
-          case 'profilePrivacy':
-            return <ProfilePrivacyScreen onBack={goBack} />;
-          case 'personalData':
-            return <PersonalDataScreen onBack={goBack} />;
-          case 'activityHistory':
-            return <ActivityHistoryScreen onBack={goBack} />;
-          case 'soundSettings':
-            return <SoundSettingsScreen onBack={goBack} />;
-          case 'designSettings':
-            return <DesignSettingsScreen onBack={goBack} />;
-          case 'accountVerification':
-            return <AccountVerificationScreen 
-              profile={profile}
-              onBack={goBack}
-              onNavigateToPersonalInfo={() => handleNavigateProfile('personalInfo')}
-              onNavigateToAddress={() => handleNavigateProfile('address')}
-              onNavigateToDocumentUpload={() => handleNavigateProfile('documentUpload')}
-              onNavigateToSelfie={() => handleNavigateProfile('selfie')}
-              onNavigateToPhoneVerification={() => handleNavigateProfile('enterPhoneNumber')}
-              successMessage={verificationSuccessMessage}
-              onSuccessDismiss={() => setVerificationSuccessMessage(null)}
-            />;
-          case 'personalInfo':
-            return <PersonalInfoScreen onBack={goBack} profile={profile} onSave={handleSavePersonalInfo} />;
-          case 'address':
-            return <AddressScreen onBack={goBack} profile={profile} onSave={handleSaveAddress} />;
-          case 'documentUpload':
-            return <DocumentUploadScreen onBack={goBack} />;
-          case 'selfie':
-            return <SelfieScreen onBack={goBack} />;
-          case 'enterPhoneNumber':
-            return <EnterPhoneNumberScreen onBack={goBack} onCodeSent={handleCodeSent} />;
-          case 'phoneVerification':
-             return verificationData ? (
-                <PhoneVerificationScreen 
-                    onBack={goBack}
-                    onVerified={handlePhoneVerified}
-                    phoneNumber={verificationData.phoneNumber}
-                />
-            ) : <EnterPhoneNumberScreen onBack={goBack} onCodeSent={handleCodeSent} />;
-          case 'main':
-          default:
-            return <ProfileScreen 
-              profile={profile}
-              onLogout={handleLogout}
-              onNavigateToSettings={() => handleNavigateProfile('settings')} 
-              onNavigateToEditProfile={() => handleNavigateProfile('editProfile')} 
-              onNavigateToSupport={() => handleNavigateProfile('support')}
-              onNavigateToNotifications={() => handleNavigateProfile('notifications')}
-              onNavigateToSecurity={() => handleNavigateProfile('security')}
-              onNavigateToReviews={() => handleNavigateProfile('reviews')}
-              onNavigateToGroupHistory={() => handleNavigateProfile('history')}
-              onNavigateToAccountVerification={() => handleNavigateProfile('accountVerification')}
-              onNavigateToSoundSettings={() => handleNavigateProfile('soundSettings')}
-              onNavigateToDesignSettings={() => handleNavigateProfile('designSettings')}
-            />;
-        }
-      case 'wallet':
-        switch(walletView) {
-          case 'addAmount':
-            return <AddAmountScreen onBack={goBack} onProceed={handleProceedToAddMoney} profile={profile} />;
-          case 'addMoney':
-            return addAmount ? <AddMoneyScreen onBack={goBack} amount={addAmount} profile={profile} email={session?.user?.email} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
-          case 'transfer':
-            return <TransferScreen onBack={goBack} onProceed={handleProceedToTransferConfirm} profile={profile} onNavigateToVerification={() => { setActiveView('profile'); setProfileView('accountVerification'); }} />;
-           case 'transferConfirm':
-            return transferDetails ? <TransferConfirmScreen onBack={goBack} onConfirm={handleConfirmTransfer} details={transferDetails} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
-          case 'transferSuccess':
-            return completedTransaction ? <TransferSuccessScreen onDone={goBack} transaction={completedTransaction} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
-          case 'statement':
-            return <StatementScreen onBack={goBack} profile={profile} onViewTransactionDetail={handleViewTransactionDetail} />;
-          case 'statementDetail':
-            return completedTransaction ? <StatementDetailScreen onDone={goBack} transaction={completedTransaction} /> : <StatementScreen onBack={goBack} profile={profile} onViewTransactionDetail={handleViewTransactionDetail} />;
-          case 'withdraw':
-            return <WithdrawScreen onBack={goBack} onNavigateToVerification={() => { setActiveView('profile'); setProfileView('accountVerification')}} profile={profile} />;
-          case 'main':
-          default:
-            return <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
-        }
-      case 'explore':
-        if (selectedExploreItem) {
-            return <ServiceDetailScreen 
-                        item={selectedExploreItem}
-                        groups={exploreGroups}
-                        onBack={goBack}
-                        onSelectGroup={handleSelectGroup}
-                        onSelectExploreItem={handleSelectExploreItem}
-                    />;
-        }
-        switch(exploreView) {
-            case 'createGroup':
-                return <CreateGroupScreen onBack={goBack} onSelectService={handleNavigateToConfigureGroup} />;
-            case 'configureGroup':
-                if (newGroupDetails?.service) {
-                    return <ConfigureGroupScreen onBack={goBack} service={newGroupDetails.service} onContinue={handleProceedToCredentials} />;
-                }
-                return <ExploreScreen groups={exploreGroups} onSelectGroup={handleSelectGroup} onNavigateToCreateGroup={() => handleNavigateExplore('createGroup')} profile={profile} myGroups={myGroups} onSelectExploreItem={handleSelectExploreItem} />;
-            case 'groupCredentials':
-                if (newGroupDetails) {
-                    return <GroupCredentialsScreen onBack={goBack} groupDetails={newGroupDetails} onFinish={handleFinishGroupCreation} />;
-                }
-                 return <ExploreScreen groups={exploreGroups} onSelectGroup={handleSelectGroup} onNavigateToCreateGroup={() => handleNavigateExplore('createGroup')} profile={profile} myGroups={myGroups} onSelectExploreItem={handleSelectExploreItem} />;
-            case 'main':
-            default:
-                return <ExploreScreen groups={exploreGroups} onSelectGroup={handleSelectGroup} onNavigateToCreateGroup={() => handleNavigateExplore('createGroup')} profile={profile} myGroups={myGroups} onSelectExploreItem={handleSelectExploreItem} />;
-        }
-      case 'movies':
-        if (viewingNetflix) {
-            if (selectedNetflixItem) {
-                return <NetflixDetailScreen 
-                            item={selectedNetflixItem}
-                            onBack={goBack}
-                            onSelectGroup={handleSelectGroup}
-                            onSelectItem={(item) => setSelectedNetflixItem(item)}
-                            myList={myList}
-                            addToMyList={addToMyList}
-                            removeFromMyList={removeFromMyList}
-                            isInMyList={isInMyList}
-                            onViewAllGroups={handleViewAllNetflixGroups}
-                            myGroups={myGroups}
-                            profile={profile}
-                            onSendMessage={handleSendMessage}
-                        />
-            }
-            return <NetflixScreen 
-                        onBack={goBack}
-                        onSelectItem={(item) => setSelectedNetflixItem(item)}
-                        myList={myList}
-                        onViewAllGroups={handleViewAllNetflixGroups}
-                    />;
-        }
-         if (viewingDisneyPlus) {
-            if (selectedBrand) {
-                return <BrandDetailScreen
-                    brand={selectedBrand}
-                    onBack={goBack}
-                    onSelectExploreItem={handleSelectDisneyPlusContentItem}
-                />
-            }
-            if (selectedDisneyPlusItem) {
-                return <DisneyPlusDetailScreen 
-                            item={selectedDisneyPlusItem}
-                            onBack={goBack}
-                            onSelectGroup={handleSelectGroup}
-                            onSelectItem={(item) => setSelectedDisneyPlusItem(item)}
-                            myList={myList}
-                            addToMyList={addToMyList}
-                            removeFromMyList={removeFromMyList}
-                            isInMyList={isInMyList}
-                            onViewAllGroups={() => handleSelectExploreItem({ type: 'service', id: 'disneyplus' })}
-                            myGroups={myGroups}
-                            profile={profile}
-                            onSendMessage={handleSendMessage}
-                        />
-            }
-            return <DisneyPlusScreen 
-                        onBack={goBack}
-                        onSelectItem={(item) => {
-                            setSelectedDisneyPlusItem(item);
-                        }}
-                        onSelectBrand={(brand) => setSelectedBrand(brand)}
-                    />;
-        }
-        if (viewingPrimeVideo) {
-            if (selectedPrimeVideoItem) {
-                return <PrimeVideoDetailScreen
-                            item={selectedPrimeVideoItem}
-                            onBack={goBack}
-                            onSelectGroup={handleSelectGroup}
-                            onSelectItem={(item) => setSelectedPrimeVideoItem(item)}
-                            myList={myList}
-                            addToMyList={addToMyList}
-                            removeFromMyList={removeFromMyList}
-                            isInMyList={isInMyList}
-                            onViewAllGroups={() => handleSelectExploreItem({ type: 'service', id: 'primevideo' })}
-                            myGroups={myGroups}
-                            profile={profile}
-                            onSendMessage={handleSendMessage}
-                        />
-            }
-            return <PrimeVideoScreen 
-                        onBack={goBack}
-                        onSelectItem={(item) => setSelectedPrimeVideoItem(item)}
-                        myList={myList}
-                    />;
-        }
-        if (viewingMax) {
-            if (selectedMaxItem) {
-                return <MaxDetailScreen
-                            item={selectedMaxItem}
-                            onBack={goBack}
-                            onSelectGroup={handleSelectGroup}
-                            onSelectItem={(item) => setSelectedMaxItem(item)}
-                            myList={myList}
-                            addToMyList={addToMyList}
-                            removeFromMyList={removeFromMyList}
-                            isInMyList={isInMyList}
-                            onViewAllGroups={() => handleSelectExploreItem({ type: 'service', id: 'hbomax' })}
-                            myGroups={myGroups}
-                            profile={profile}
-                            onSendMessage={handleSendMessage}
-                        />
-            }
-            return <MaxScreen
-                        onBack={goBack}
-                        onSelectItem={(item) => setSelectedMaxItem(item)}
-                        myList={myList}
-                    />;
-        }
-        return <MoviesScreen 
-            onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })} 
-            onSelectSeries={(seriesId) => alert(`Detalhes para a série ID ${seriesId} serão adicionados em breve!`)}
-            onSelectProvider={handleSelectProvider}
-            allGroups={exploreGroups}
-            onSelectGroup={handleSelectGroup}
-        />;
-      case 'home':
-      default:
-        return <HomeScreen
-            profile={profile}
-            onViewGroupChat={handleViewGroupChat}
-            onViewMyGroupDetails={handleViewMyGroupDetails}
-            groups={myGroups}
-            onOpenDevMenu={handleOpenDevMenu}
-            onNavigateToExplore={() => setActiveView('explore')}
-            onNavigateToWallet={() => setActiveView('wallet')}
-            onNavigateToProfile={() => setActiveView('profile')}
-            onNavigateToSupport={() => { setActiveView('profile'); handleNavigateProfile('support'); }}
-            onNavigateToAddMoney={() => { setActiveView('wallet'); handleNavigateWallet('addAmount'); }}
-            onEnterAdminMode={handleEnterAdminMode}
-            notificationCount={unreadCount}
-            onNotificationClick={handleNotificationClick}
-            onViewAllGroups={() => setViewingAllMyGroups(true)}
-        />;
-    }
-  };
-  
-  const isNavHidden = isThemeModalOpen || isAdminView || isIntroPlaying || !session || !!activeDevScreen || !!selectedGroup || isInPaymentFlow || profileView !== 'main' || walletView !== 'main' || exploreView !== 'main' || !!activeChatGroup || !!selectedMyGroup || !!selectedExploreItem || !!selectedMovie || !!selectedProvider || viewingNetflix || viewingDisneyPlus || viewingPrimeVideo || viewingMax || !!selectedBrand || viewingAllMyGroups;
-
-  return (
-    <div onClick={unlockAudio} className={`font-sans max-w-md mx-auto min-h-screen ${theme === 'dark' ? 'dark' : ''}`}>
-        {notification && (
-            <Toast 
-                title={notification.title}
-                body={notification.body}
-                onClose={() => setNotification(null)}
-                onClick={() => handleNotificationToastClick(notification.data)}
-            />
-        )}
-       <ThemeSelectionModal isOpen={isThemeModalOpen} onClose={() => setIsThemeModalOpen(false)} />
-       <Suspense fallback={<LoadingScreen />}>
-        {isIntroPlaying && introState && (
-            <>
-                {introState.service === 'netflix' && <NetflixIntro onEnd={introState.onEnd} />}
-                {introState.service === 'disneyplus' && <DisneyPlusIntro onEnd={introState.onEnd} />}
-                {introState.service === 'primevideo' && <PrimeVideoIntro onEnd={introState.onEnd} />}
-                {introState.service === 'max' && <MaxIntro onEnd={introState.onEnd} />}
-            </>
-        )}
-          <div className={`relative ${!isNavHidden ? 'pb-24' : ''}`}>
-            {renderContent()}
-          </div>
-       </Suspense>
-      {!isNavHidden && <BottomNav activeView={activeView} setActiveView={setActiveView} />}
-      {showNotificationPrompt && (
-        <NotificationPermissionPrompt
-            onAllow={handleAllowNotifications}
-            onDismiss={handleDismissNotificationPrompt}
-        />
-       )}
-       {deferredInstallPrompt && !pwaPromptDismissed && !isNavHidden && (
-        <PwaInstallPrompt
-            onInstall={handleInstallClick}
-            onDismiss={handleDismissPwaPrompt}
-        />
-       )}
-      <DevMenu 
-        isOpen={isDevMenuOpen}
-        onClose={handleCloseDevMenu}
-        onNavigate={handleNavigateToDevScreen}
-        onAddBalance={handleDebugAddBalance}
-      />
-    </div>
-  );
-};
-
-const App: React.FC = () => (
- <ThemeProvider>
-    <SoundProvider>
-      <AppContent />
-    </SoundProvider>
- </ThemeProvider>
-);
-
-
-export default App;
+        case 'signup

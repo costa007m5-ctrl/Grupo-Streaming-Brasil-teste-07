@@ -69,7 +69,7 @@ export interface Group {
   };
   host_id?: string;
   reviews?: Review[];
-// FIX: Add optional rating properties to Group type to match data returned by get_explore_groups RPC.
+  // FIX: Add optional rating properties to Group type to match data returned by get_explore_groups RPC.
   host_rating_avg?: number;
   host_rating_count?: number;
 }

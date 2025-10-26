@@ -4,9 +4,6 @@ import { AVAILABLE_SERVICES_DATA } from '../constants';
 
 interface LoginScreenProps {
     onEmailLogin: (email: string, password: string) => Promise<void>;
-    onPhonePasswordLogin: (phone: string, password: string) => Promise<void>;
-    onPhoneOtpRequest: (phone: string) => Promise<any>;
-    onPhoneOtpVerify: (phone: string, token: string) => Promise<void>;
     onNavigateToSignUp: () => void;
     onNavigateToForgotPassword: () => void;
     onBack: () => void;

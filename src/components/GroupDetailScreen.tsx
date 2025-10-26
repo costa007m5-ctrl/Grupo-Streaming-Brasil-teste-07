@@ -49,6 +49,7 @@ const GroupInfo: React.FC<{ group: Group }> = ({ group }) => {
     );
 };
 
+// FIX: Refactored GroupHost to accept the entire 'group' object, avoiding redundant data fetching for host ratings.
 const GroupHost: React.FC<{ group: Group }> = ({ group }) => {
     const { theme } = useTheme();
     const { host_name, members_list, host_rating_avg, host_rating_count } = group;

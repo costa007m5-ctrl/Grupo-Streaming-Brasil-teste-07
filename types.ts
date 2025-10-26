@@ -230,3 +230,29 @@ export interface SupportTicket {
   user_full_name?: string;
   user_avatar_url?: string;
 }
+
+// FIX: Moved shared types from App.tsx to types.ts to fix module resolution errors.
+export type AppView = 'home' | 'explore' | 'movies' | 'wallet' | 'profile';
+export type ProfileView = 
+  'main' | 'settings' | 'support' | 'editProfile' | 'notifications' | 
+  'security' | 'reviews' | 'history' | 
+  'twoFactorAuth' | 'biometrics' | 'changePassword' | 'connectedDevices' | 
+  'profilePrivacy' | 'personalData' | 'activityHistory' |
+  'accountVerification' | 'personalInfo' | 'address' | 'documentUpload' | 'selfie' | 
+  'enterPhoneNumber' | 'phoneVerification' | 'changeAvatar' | 'soundSettings' | 'designSettings';
+
+export type WalletView = 'main' | 'addAmount' | 'addMoney' | 'transfer' | 'transferConfirm' | 'statement' | 'withdraw' | 'transferSuccess' | 'statementDetail';
+export type ExploreView = 'main' | 'createGroup' | 'configureGroup' | 'groupCredentials';
+export type AuthView = 'welcome' | 'login' | 'signup' | 'forgotPassword' | 'updatePassword' | 'terms';
+export type DevScreen = 'sql' | 'payment';
+export type ExploreDetailItem = { type: 'service' | 'category' | 'movie'; id: string };
+
+export interface ProfileUpdateData {
+    name: string;
+    phone: string;
+    birthDate: string;
+}
+
+export interface VerificationData {
+    phoneNumber: string;
+}
