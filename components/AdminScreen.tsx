@@ -19,7 +19,6 @@ interface AdminScreenProps {
     onBack: () => void;
     onInstallApp: () => void;
     showInstallButton: boolean;
-    onTestNotification: () => void;
 }
 
 const Header: React.FC<{ onBack: () => void; title: string }> = ({ onBack, title }) => (
@@ -294,7 +293,7 @@ const SupportView: React.FC<{ tickets: SupportTicket[], onSelectTicket: (ticket:
     );
 }
 
-const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showInstallButton, onTestNotification }) => {
+const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showInstallButton }) => {
     const [activeView, setActiveView] = useState<AdminView>('stats');
     const [isLoading, setIsLoading] = useState(true);
     const [allUsers, setAllUsers] = useState<Profile[]>([]);
@@ -321,21 +320,19 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showIns
             if (transactionsRes.error) throw transactionsRes.error;
             if (ticketsRes.error) throw ticketsRes.error;
 
-            const usersData = usersRes.data as Profile[];
-            setAllUsers(usersData);
+            setAllUsers(usersRes.data as Profile[]);
             setAllGroups(groupsRes.data as Group[]);
 
-// FIX: Explicitly type the user map and data arrays to resolve 'unknown' type errors during data transformation.
-            const usersMap = new Map(usersData.map(u => [u.id, u.full_name]));
+            const usersMap = new Map(usersRes.data.map(u => [u.id, u.full_name]));
             const transactionsWithName = (transactionsRes.data as Transaction[]).map(tx => ({...tx, user_full_name: usersMap.get(tx.user_id) || 'Usuário Deletado' }));
             setAllTransactions(transactionsWithName);
 
-            const ticketsWithUsers = (ticketsRes.data as SupportTicket[]).map(t => ({...t, user_full_name: usersMap.get(t.user_id) || 'Usuário Deletado', user_avatar_url: usersData.find(u => u.id === t.user_id)?.avatar_url }));
+            const ticketsWithUsers = (ticketsRes.data as SupportTicket[]).map(t => ({...t, user_full_name: usersMap.get(t.user_id) || 'Usuário Deletado', user_avatar_url: usersRes.data.find(u => u.id === t.user_id)?.avatar_url }));
             setAllTickets(ticketsWithUsers);
             
             // Calculate stats
             const dailyVolume = transactionsWithName.filter(tx => tx.created_at.startsWith(today) && tx.amount < 0).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-            const newUsersToday = usersData.filter(u => u.created_at?.startsWith(today)).length;
+            const newUsersToday = usersRes.data.filter(u => u.created_at?.startsWith(today)).length;
             
             setStats({
                 dailyVolume,
@@ -366,11 +363,22 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showIns
             setAllTickets(allTickets.map(t => t.id === ticketId ? updatedTicket : t));
         }
     };
+
+    const handleTestNotification = () => {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Teste de Notificação', {
+                body: 'Esta é uma notificação de teste do modo Admin!',
+                icon: 'https://img.icons8.com/fluency/192/play-button-circled.png'
+            });
+        } else {
+            alert('A permissão de notificação não foi concedida. Ative nas configurações do navegador.');
+        }
+    };
     
     const renderCurrentView = () => {
         switch (activeView) {
             case 'stats':
-                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={onTestNotification} />;
+                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={handleTestNotification} />;
             case 'users':
                 return <ListView items={allUsers} CardComponent={UserCard} title="Usuários" />;
             case 'groups':
@@ -382,7 +390,7 @@ const AdminScreen: React.FC<AdminScreenProps> = ({ onBack, onInstallApp, showIns
             case 'publicidade':
                 return <AdvertisingView groups={allGroups} />;
             default:
-                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={onTestNotification} />;
+                return <StatsView stats={stats} recentUsers={allUsers} recentGroups={allGroups} onInstallApp={onInstallApp} showInstallButton={showInstallButton} onTestNotification={handleTestNotification} />;
         }
     };
 

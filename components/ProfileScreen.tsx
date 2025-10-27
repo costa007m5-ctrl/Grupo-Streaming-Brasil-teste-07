@@ -15,7 +15,6 @@ import {
     ChevronRightIcon,
     DocumentDuplicateIcon,
     SparklesIcon,
-    StarIcon,
 } from './Icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -80,14 +79,6 @@ const UserInfo: React.FC<{ profile: Profile | null }> = ({ profile }) => {
             </div>
             <h2 className={`mt-4 text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{profile?.full_name || 'Carregando...'}</h2>
             <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{email}</p>
-            
-            {(profile?.host_rating_count ?? 0) > 0 && (
-                <div className={`mt-2 flex items-center space-x-1.5 rounded-full py-1 px-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <StarIcon className="w-4 h-4 text-yellow-400" solid />
-                    <span className={`font-bold text-sm ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{profile?.host_rating_avg?.toFixed(1)}</span>
-                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Anfitrião ({profile?.host_rating_count})</span>
-                </div>
-            )}
             
             <div className="mt-2 relative">
                 <div 

@@ -1,6 +1,5 @@
-
 export default async function handler(req, res) {
-  const { MercadoPagoConfig, Preference } = await import('https://esm.sh/mercadopago@2.9.0');
+  const { MercadoPagoConfig, Preference } = await import("https://esm.sh/mercadopago");
   // Adiciona cabeçalhos CORS para desenvolvimento
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

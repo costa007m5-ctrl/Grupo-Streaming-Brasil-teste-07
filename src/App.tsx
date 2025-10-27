@@ -1,5 +1,4 @@
-// FIX: Imported useMemo hook from React to resolve 'Cannot find name useMemo' error.
-import React, { useState, useEffect, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import BottomNav from './components/BottomNav';
 import type { AvailableService, NewGroupDetails, Group, Profile, ChatMessage, GroupMember, CompletedTransaction, MovieInfo, TvShow, Brand } from './types';
 import { GroupStatus } from './types';
@@ -18,7 +17,6 @@ import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 
 // Lazy load screen components for code splitting
-const AllMyGroupsScreen = lazy(() => import('./components/AllMyGroupsScreen'));
 const HomeScreen = lazy(() => import('./components/HomeScreen'));
 const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
 const WalletScreen = lazy(() => import('./components/WalletScreen'));
@@ -152,11 +150,9 @@ const AppContent: React.FC = () => {
   const [selectedMyGroup, setSelectedMyGroup] = useState<Group | null>(null);
   const [verificationData, setVerificationData] = useState<VerificationData | null>(null);
   const [verificationSuccessMessage, setVerificationSuccessMessage] = useState<string | null>(null);
-  const [initialChatGroupId, setInitialChatGroupId] = useState<string | null>(null);
   
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [exploreGroups, setExploreGroups] = useState<Group[]>([]);
-  const [viewingAllMyGroups, setViewingAllMyGroups] = useState(false);
 
   // Service clone states
   const [viewingNetflix, setViewingNetflix] = useState(false);
@@ -170,9 +166,7 @@ const AppContent: React.FC = () => {
   const [selectedMaxItem, setSelectedMaxItem] = useState<ContentItem | null>(null);
 
   // Notifications
-  const [notification, setNotification] = useState<{title: string, body: string, data?: any} | null>(null);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notification, setNotification] = useState<{title: string, body: string} | null>(null);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   // PWA Install Prompt
@@ -237,11 +231,6 @@ const AppContent: React.FC = () => {
   // Splash screen state
   const [showSplashScreen, setShowSplashScreen] = useState(true);
   const [showPostLoginSplash, setShowPostLoginSplash] = useState(false);
-
-  const allGroups = useMemo(() => {
-    const all = [...myGroups, ...exploreGroups];
-    return Array.from(new Map(all.map(item => [item.id, item])).values());
-  }, [myGroups, exploreGroups]);
 
 
   const unlockAudio = () => {
@@ -383,17 +372,16 @@ const AppContent: React.FC = () => {
 
       setProfile(profileData as Profile);
 
-// FIX: Correctly call the 'get_explore_groups' RPC function and separate groups into 'myGroups' and 'exploreGroups'.
-      const { data: groupsData, error: groupsError } = await supabase.rpc('get_explore_groups');
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select('*')
+        .order('id', { ascending: false });
 
       if (groupsError) throw groupsError;
       if (groupsData) {
         const allGroups = groupsData as Group[];
-        const userGroups = allGroups.filter(g => profileData && g.members_list.some(m => m.id === profileData.id));
-        const otherGroups = allGroups.filter(g => profileData && !g.members_list.some(m => m.id === profileData.id));
-
-        setMyGroups(userGroups);
-        setExploreGroups(otherGroups);
+        setExploreGroups(allGroups);
+        setMyGroups(allGroups);
       }
     } catch (error) {
       const typedError = error as { message: string };
@@ -414,11 +402,6 @@ const AppContent: React.FC = () => {
     }
   }, [session]);
 
-  const handleViewGroupChat = (group: Group) => {
-    setActiveChatGroup(group);
-    setSelectedMyGroup(null);
-  };
-
   // Setup notifications
   useEffect(() => {
     if (!session) {
@@ -427,8 +410,11 @@ const AppContent: React.FC = () => {
     
     if ('Notification' in window) {
         if (Notification.permission === 'granted') {
+            // If permission is already granted, we can get the token.
+            // requestPermissionAndToken will handle this without showing a prompt.
             requestPermissionAndToken();
         } else if (Notification.permission === 'default') {
+             // If permission is not yet asked, we show our custom prompt.
              const hasDismissed = sessionStorage.getItem('notification_prompt_dismissed');
              if (!hasDismissed) {
                  setShowNotificationPrompt(true);
@@ -436,16 +422,14 @@ const AppContent: React.FC = () => {
         }
     }
 
+    // Set up listener for foreground messages
     const unsubscribe = onMessage(messaging, (payload) => {
         console.log('Mensagem recebida em primeiro plano. ', payload);
         if (payload.notification) {
             setNotification({
                 title: payload.notification.title || 'Nova Notificação',
-                body: payload.notification.body || '',
-                data: payload.data
+                body: payload.notification.body || ''
             });
-            setNotifications(prev => [payload.notification, ...prev]);
-            setUnreadCount(prev => prev + 1);
         }
     });
 
@@ -497,25 +481,6 @@ const AppContent: React.FC = () => {
       setShowNotificationPrompt(false);
       sessionStorage.setItem('notification_prompt_dismissed', 'true');
   };
-  
-  const handleNotificationToastClick = (data: any) => {
-    if (data?.type === 'chat_message' && data?.groupId) {
-        const group = allGroups.find(g => g.id === parseInt(data.groupId, 10));
-        if (group) {
-            handleViewGroupChat(group);
-        }
-    } else {
-        setActiveView('profile');
-        handleNavigateProfile('notifications');
-    }
-    setUnreadCount(0);
-  };
-  
-  const handleNotificationClick = () => {
-    setActiveView('profile');
-    handleNavigateProfile('notifications');
-    setUnreadCount(0);
-  };
 
   useEffect(() => {
     setProfileView('main');
@@ -528,7 +493,6 @@ const AppContent: React.FC = () => {
     setSelectedExploreItem(null);
     setSelectedMovie(null);
     setSelectedProvider(null);
-    setViewingAllMyGroups(false);
     setViewingNetflix(false);
     setSelectedNetflixItem(null);
     setViewingDisneyPlus(false);
@@ -816,65 +780,48 @@ const AppContent: React.FC = () => {
         if (profile.balance < groupToJoin.price) { alert("Saldo insuficiente."); return; }
         if (groupToJoin.members_list.some(m => m.id === profile.id)) { alert("Você já está neste grupo."); return; }
         if (groupToJoin.members >= groupToJoin.max_members) { alert("Grupo está lotado."); return; }
+
+        const newMember: GroupMember = {
+            id: profile.id,
+            name: profile.full_name,
+            role: 'Membro' as const,
+            joinDate: new Date().toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', ''),
+            avatarUrl: profile.avatar_url
+        };
         
-        try {
-            const { error } = await supabase.rpc('join_group', {
-                group_id_to_join: groupToJoin.id
+        const newMembersList = [...groupToJoin.members_list, newMember];
+        const newMemberCount = groupToJoin.members + 1;
+        const newBalance = profile.balance - groupToJoin.price;
+
+        const { error: transactionInsertError } = await supabase
+            .from('transactions')
+            .insert({
+                user_id: profile.id,
+                amount: -groupToJoin.price,
+                type: 'payment',
+                description: `Pagamento grupo ${groupToJoin.name}`,
+                metadata: { group_id: groupToJoin.id }
             });
-            if (error) throw error;
-            
+
+        const { error: groupUpdateError } = await supabase.from('groups').update({
+            members: newMemberCount,
+            members_list: newMembersList
+        }).eq('id', groupToJoin.id);
+
+        const { error: profileUpdateError } = await supabase.from('profiles').update({
+            balance: newBalance
+        }).eq('id', profile.id);
+
+        if (groupUpdateError || profileUpdateError || transactionInsertError) {
+            alert("Erro ao entrar no grupo. Se o valor foi debitado, contate o suporte.");
+        } else {
             alert("Você entrou no grupo com sucesso!");
             fetchUserData();
             setIsInPaymentFlow(false);
             setSelectedGroup(null);
-        } catch(error: any) {
-            alert("Erro ao entrar no grupo: " + error.message + ". Se o valor foi debitado, contate o suporte.");
         }
     };
     
-    const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
-        const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
-        if (!targetGroup) return;
-
-        // Call the RPC function to send the message.
-        // The backend will verify if the user is a member.
-        const { error } = await supabase.rpc('send_group_message', {
-            group_id_to_update: groupId,
-            new_message: newMessage
-        });
-
-        if (error) {
-            alert('Falha ao enviar mensagem: ' + error.message);
-        } else {
-            // Optimistically update the UI
-            const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
-            const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
-            setMyGroups(prev => updateGroupState(prev));
-            setExploreGroups(prev => updateGroupState(prev));
-            if (activeChatGroup?.id === groupId) {
-                setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
-            }
-        }
-    };
-    
-    const handleSubmitReview = async (groupId: number, rating: number, comment: string) => {
-        if (!profile) return;
-
-        const { error } = await supabase.rpc('submit_review', {
-            p_group_id: groupId,
-            p_rating: rating,
-            p_comment: comment
-        });
-
-        if (error) {
-            alert("Erro ao enviar avaliação: " + error.message);
-        } else {
-            alert("Avaliação enviada com sucesso!");
-            // Re-fetch user data to get updated group and profile info
-            fetchUserData();
-        }
-    };
-
     const handleSelectExploreItem = async (item: ExploreDetailItem) => {
         if (item.type === 'movie') {
             setLoading(true);
@@ -1051,12 +998,37 @@ const AppContent: React.FC = () => {
         handleSelectExploreItem({ type: 'service', id: 'netflix' });
     };
 
+  const handleViewGroupChat = (group: Group) => {
+    setActiveChatGroup(group);
+    setSelectedMyGroup(null);
+  };
+
   const handleViewMyGroupDetails = (group: Group) => {
     setSelectedMyGroup(group);
   };
 
   const handleBackFromMyGroupDetails = () => {
     setSelectedMyGroup(null);
+  };
+
+  const handleSendMessage = async (groupId: number, newMessage: ChatMessage) => {
+    const targetGroup = myGroups.find(g => g.id === groupId) || exploreGroups.find(g => g.id === groupId);
+    if (!targetGroup) return;
+
+    const updatedChatHistory = [...(targetGroup.chat_history || []), newMessage];
+
+    const { error } = await supabase.from('groups').update({ chat_history: updatedChatHistory }).eq('id', groupId);
+
+    if (error) {
+        alert('Falha ao enviar mensagem: ' + error.message);
+    } else {
+        const updateGroupState = (groups: Group[]) => groups.map(g => g.id === groupId ? { ...g, chat_history: updatedChatHistory } : g);
+        setMyGroups(prev => updateGroupState(prev));
+        setExploreGroups(prev => updateGroupState(prev));
+        if (activeChatGroup?.id === groupId) {
+            setActiveChatGroup(prev => prev ? { ...prev, chat_history: updatedChatHistory } : null);
+        }
+    }
   };
 
   const handleUpdateProfile = async (data: ProfileUpdateData) => {
@@ -1236,125 +1208,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handleTestNotification = () => {
-    if (!('Notification' in window)) {
-        alert('Este navegador não suporta notificações.');
-        return;
-    }
-    if (Notification.permission === 'granted') {
-        const notification = new Notification('Notificação de Teste 🚀', {
-            body: 'Se você vê isto, as notificações locais estão funcionando!',
-            icon: 'https://img.icons8.com/fluency/192/play-button-circled.png'
-        });
-        notification.onclick = () => {
-            handleNavigateProfile('notifications');
-        };
-    } else {
-        alert('Permissão para notificações não foi concedida.');
-    }
-  };
-
-  // Back button and navigation logic
-  // FIX: Moved 'isIntroPlaying' declaration before its use in 'goBack' to fix a ReferenceError.
-  const isIntroPlaying = !!introState;
-  const goBack = useCallback(() => {
-    if (isIntroPlaying || showSplashScreen || showPostLoginSplash) return;
-    if (activeDevScreen) { handleBackFromDevScreen(); return; }
-    if (isAdminView) { setIsAdminView(false); return; }
-    if (activeChatGroup) { setActiveChatGroup(null); return; }
-    if (selectedMyGroup) { handleBackFromMyGroupDetails(); return; }
-    if (viewingAllMyGroups) { setViewingAllMyGroups(false); return; }
-    if (selectedNetflixItem) { setSelectedNetflixItem(null); return; }
-    if (viewingNetflix) { setViewingNetflix(false); return; }
-    if (selectedDisneyPlusItem || selectedBrand) { setSelectedDisneyPlusItem(null); setSelectedBrand(null); return; }
-    if (viewingDisneyPlus) { setViewingDisneyPlus(false); return; }
-    if (selectedPrimeVideoItem) { setSelectedPrimeVideoItem(null); return; }
-    if (viewingPrimeVideo) { setViewingPrimeVideo(false); return; }
-    if (selectedMaxItem) { setSelectedMaxItem(null); return; }
-    if (viewingMax) { setViewingMax(false); return; }
-    if (isInPaymentFlow) { handleBackFromPayment(); return; }
-    if (selectedGroup) { handleBackFromDetail(); return; }
-    if (selectedMovie || selectedProvider || selectedExploreItem) { handleBackFromExploreDetail(); return; }
-    if (profileView === 'changeAvatar') { setProfileView('editProfile'); return; }
-    if (['twoFactorAuth', 'biometrics', 'changePassword', 'connectedDevices', 'profilePrivacy', 'personalData', 'activityHistory'].includes(profileView)) { handleBackToSecurity(); return; }
-    if (['personalInfo', 'address', 'documentUpload', 'selfie', 'enterPhoneNumber', 'phoneVerification'].includes(profileView)) { handleBackToVerificationMain(); return; }
-    if (profileView !== 'main') { handleBackToProfileMain(); return; }
-    if (walletView !== 'main') { handleBackToWalletMain(); return; }
-    if (exploreView !== 'main') { handleBackToExploreMain(); return; }
-    if (authView !== 'welcome' && !session) { setAuthView('welcome'); return; }
-    
-    // If no specific back action is taken, allow default browser behavior (which might be to exit)
-    window.history.back();
-
-  }, [
-      isIntroPlaying, showSplashScreen, showPostLoginSplash, activeDevScreen, isAdminView, activeChatGroup,
-      selectedMyGroup, viewingAllMyGroups, selectedNetflixItem, viewingNetflix, selectedDisneyPlusItem,
-      selectedBrand, viewingDisneyPlus, selectedPrimeVideoItem, viewingPrimeVideo, selectedMaxItem,
-      viewingMax, isInPaymentFlow, selectedGroup, selectedMovie, selectedProvider, selectedExploreItem,
-      profileView, walletView, exploreView, authView, session
-  ]);
-
-  useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-        goBack();
-    };
-    window.addEventListener('popstate', handlePopState);
-    // Push an initial state to ensure the first back press is caught
-    window.history.pushState({ appState: 'initial' }, '');
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [goBack]);
-
-  useEffect(() => {
-      const params = new URLSearchParams(window.location.search);
-      const chatGroupId = params.get('chatGroupId');
-      if (chatGroupId) {
-          setInitialChatGroupId(chatGroupId);
-          // Clean the URL
-          window.history.replaceState(null, '', window.location.pathname);
-      }
-  }, []);
-
-  useEffect(() => {
-      if (initialChatGroupId && allGroups.length > 0) {
-          const group = allGroups.find(g => g.id === parseInt(initialChatGroupId, 10));
-          if (group) {
-              handleViewGroupChat(group);
-              setInitialChatGroupId(null); // Consume it
-          }
-      }
-  }, [initialChatGroupId, allGroups]);
-// FIX: Implement handlers for privacy settings, data download, and account deletion to pass as props.
-  const handleSavePrivacySettings = async (updates: { is_profile_private?: boolean; is_searchable?: boolean; }) => {
-    if (!profile) return;
-    const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', profile.id)
-        .select()
-        .single();
-
-    if (error) {
-        alert('Erro ao salvar configurações de privacidade: ' + error.message);
-    } else {
-        setProfile(data as Profile);
-        alert('Configurações salvas!');
-        handleBackToSecurity();
-    }
-  };
-
-  const handleDownloadData = () => {
-    alert('Sua solicitação de download foi recebida. O arquivo será enviado para o seu e-mail em até 24 horas.');
-  };
-  
-  const handleDeleteAccount = () => {
-    alert('Para sua segurança, a exclusão de conta deve ser solicitada através do suporte. Isso abrirá um ticket para nossa equipe.');
-    setActiveView('profile');
-    handleNavigateProfile('support');
-  };
-
   const renderAuthContent = () => {
     switch(authView) {
         case 'login':
@@ -1391,7 +1244,6 @@ const AppContent: React.FC = () => {
             onBack={() => setIsAdminView(false)} 
             onInstallApp={handleInstallClick}
             showInstallButton={!!deferredInstallPrompt}
-            onTestNotification={handleTestNotification}
         />;
     }
     
@@ -1405,29 +1257,12 @@ const AppContent: React.FC = () => {
     if (!session) {
         return renderAuthContent();
     }
-    
-    if (activeChatGroup) {
-      return <GroupChatScreen group={activeChatGroup} onBack={goBack} profile={profile} onSendMessage={handleSendMessage} />;
-    }
-
-    if (selectedMyGroup) {
-      return <MyGroupDetailScreen group={selectedMyGroup} onBack={goBack} onGoToChat={handleViewGroupChat} />;
-    }
-    
-    if (viewingAllMyGroups) {
-      return <AllMyGroupsScreen
-        groups={myGroups}
-        onBack={goBack}
-        onViewGroupChat={handleViewGroupChat}
-        onViewMyGroupDetails={handleViewMyGroupDetails}
-      />;
-    }
 
     if (selectedMovie) {
         return <MovieDetailScreen
           movie={selectedMovie}
-          allGroups={allGroups}
-          onBack={goBack}
+          allGroups={exploreGroups}
+          onBack={handleBackFromExploreDetail}
           onSelectGroup={handleSelectGroup}
           onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })}
           myList={myList}
@@ -1440,36 +1275,44 @@ const AppContent: React.FC = () => {
     if (selectedProvider) {
         return <ProviderDetailScreen 
             service={selectedProvider} 
-            onBack={goBack}
+            onBack={() => {setSelectedProvider(null)}}
             onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })} 
             onSelectSeries={(seriesId) => alert(`Detalhes para a série ID ${seriesId} serão adicionados em breve!`)}
         />
     }
     
+    if (selectedMyGroup) {
+      return <MyGroupDetailScreen group={selectedMyGroup} onBack={handleBackFromMyGroupDetails} onGoToChat={handleViewGroupChat} />;
+    }
+    
+    if (activeChatGroup) {
+      return <GroupChatScreen group={activeChatGroup} onBack={() => setActiveChatGroup(null)} profile={profile} onSendMessage={handleSendMessage} />;
+    }
+    
     if (isInPaymentFlow && selectedGroup) {
-      return <PaymentScreen group={selectedGroup} onBack={goBack} onConfirm={() => handleJoinGroup(selectedGroup)} profile={profile} email={session?.user?.email} />;
+      return <PaymentScreen group={selectedGroup} onBack={handleBackFromPayment} onConfirm={() => handleJoinGroup(selectedGroup)} profile={profile} email={session?.user?.email} />;
     }
 
     if (selectedGroup) {
-      return <GroupDetailScreen group={selectedGroup} onBack={goBack} onProceedToPayment={handleProceedToPayment} />;
+      return <GroupDetailScreen group={selectedGroup} onBack={handleBackFromDetail} onProceedToPayment={handleProceedToPayment} />;
     }
     
     switch (activeView) {
       case 'profile':
         switch (profileView) {
           case 'editProfile':
-            return <EditProfileScreen onBack={goBack} profile={profile} onSave={handleUpdateProfile} onNavigateToChangeAvatar={() => handleNavigateProfile('changeAvatar')} email={session?.user?.email} />;
+            return <EditProfileScreen onBack={handleBackToProfileMain} profile={profile} onSave={handleUpdateProfile} onNavigateToChangeAvatar={() => handleNavigateProfile('changeAvatar')} email={session?.user?.email} />;
           case 'changeAvatar':
-            return <ChangeAvatarScreen onBack={goBack} profile={profile} onSave={handleUpdateAvatar} />;
+            return <ChangeAvatarScreen onBack={() => setProfileView('editProfile')} profile={profile} onSave={handleUpdateAvatar} />;
           case 'support':
-            return <SupportScreen onBack={goBack} />;
+            return <SupportScreen onBack={handleBackToProfileMain} />;
           case 'settings':
-            return <SettingsScreen onBack={goBack} onNavigateToSupport={() => handleNavigateProfile('support')} />;
+            return <SettingsScreen onBack={handleBackToProfileMain} onNavigateToSupport={() => handleNavigateProfile('support')} />;
           case 'notifications':
-            return <NotificationsScreen onBack={goBack} />;
+            return <NotificationsScreen onBack={handleBackToProfileMain} />;
           case 'security':
             return <SecurityPrivacyScreen
-              onBack={goBack}
+              onBack={handleBackToProfileMain}
               onNavigateToTwoFactorAuth={() => handleNavigateProfile('twoFactorAuth')}
               onNavigateToBiometrics={() => handleNavigateProfile('biometrics')}
               onNavigateToChangePassword={() => handleNavigateProfile('changePassword')}
@@ -1479,36 +1322,31 @@ const AppContent: React.FC = () => {
               onNavigateToActivityHistory={() => handleNavigateProfile('activityHistory')}
             />;
           case 'reviews':
-            // FIX: Pass all required props to MyReviewsScreen to resolve type error.
-            return <MyReviewsScreen onBack={goBack} allGroups={allGroups} profile={profile} onSubmitReview={handleSubmitReview} />;
+            return <MyReviewsScreen onBack={handleBackToProfileMain} />;
           case 'history':
-            return <GroupHistoryScreen onBack={goBack} groups={myGroups} />;
+            return <GroupHistoryScreen onBack={handleBackToProfileMain} groups={myGroups} />;
           case 'twoFactorAuth':
-            return <TwoFactorAuthScreen onBack={goBack} />;
+            return <TwoFactorAuthScreen onBack={handleBackToSecurity} />;
           case 'biometrics':
-            return <BiometricsScreen onBack={goBack} />;
+            return <BiometricsScreen onBack={handleBackToSecurity} />;
           case 'changePassword':
-            // FIX: Pass the required onPasswordUpdated prop.
-            return <ChangePasswordScreen onBack={goBack} onPasswordUpdated={() => { alert('Senha alterada com sucesso!'); handleBackToSecurity(); }} />;
+            return <ChangePasswordScreen onBack={handleBackToSecurity} />;
           case 'connectedDevices':
-            return <ConnectedDevicesScreen onBack={goBack} />;
+            return <ConnectedDevicesScreen onBack={handleBackToSecurity} />;
           case 'profilePrivacy':
-            // FIX: Pass the required profile and onSave props.
-            return <ProfilePrivacyScreen onBack={goBack} profile={profile} onSave={handleSavePrivacySettings} />;
+            return <ProfilePrivacyScreen onBack={handleBackToSecurity} />;
           case 'personalData':
-            // FIX: Pass the required onDownload and onDelete props.
-            return <PersonalDataScreen onBack={goBack} onDownload={handleDownloadData} onDelete={handleDeleteAccount} />;
+            return <PersonalDataScreen onBack={handleBackToSecurity} />;
           case 'activityHistory':
-            // FIX: Pass the required profile prop.
-            return <ActivityHistoryScreen onBack={goBack} profile={profile} />;
+            return <ActivityHistoryScreen onBack={handleBackToSecurity} />;
           case 'soundSettings':
-            return <SoundSettingsScreen onBack={goBack} />;
+            return <SoundSettingsScreen onBack={handleBackToProfileMain} />;
           case 'designSettings':
-            return <DesignSettingsScreen onBack={goBack} />;
+            return <DesignSettingsScreen onBack={handleBackToProfileMain} />;
           case 'accountVerification':
             return <AccountVerificationScreen 
               profile={profile}
-              onBack={goBack}
+              onBack={handleBackToProfileMain}
               onNavigateToPersonalInfo={() => handleNavigateProfile('personalInfo')}
               onNavigateToAddress={() => handleNavigateProfile('address')}
               onNavigateToDocumentUpload={() => handleNavigateProfile('documentUpload')}
@@ -1518,23 +1356,26 @@ const AppContent: React.FC = () => {
               onSuccessDismiss={() => setVerificationSuccessMessage(null)}
             />;
           case 'personalInfo':
-            return <PersonalInfoScreen onBack={goBack} profile={profile} onSave={handleSavePersonalInfo} />;
+            return <PersonalInfoScreen onBack={handleBackToVerificationMain} profile={profile} onSave={handleSavePersonalInfo} />;
           case 'address':
-            return <AddressScreen onBack={goBack} profile={profile} onSave={handleSaveAddress} />;
+            return <AddressScreen onBack={handleBackToVerificationMain} profile={profile} onSave={handleSaveAddress} />;
           case 'documentUpload':
-            return <DocumentUploadScreen onBack={goBack} />;
+            return <DocumentUploadScreen onBack={handleBackToVerificationMain} />;
           case 'selfie':
-            return <SelfieScreen onBack={goBack} />;
+            return <SelfieScreen onBack={handleBackToVerificationMain} />;
           case 'enterPhoneNumber':
-            return <EnterPhoneNumberScreen onBack={goBack} onCodeSent={handleCodeSent} />;
+            return <EnterPhoneNumberScreen onBack={handleBackToVerificationMain} onCodeSent={handleCodeSent} />;
           case 'phoneVerification':
              return verificationData ? (
                 <PhoneVerificationScreen 
-                    onBack={goBack}
+                    onBack={() => {
+                        setVerificationData(null);
+                        handleNavigateProfile('enterPhoneNumber');
+                    }}
                     onVerified={handlePhoneVerified}
                     phoneNumber={verificationData.phoneNumber}
                 />
-            ) : <EnterPhoneNumberScreen onBack={goBack} onCodeSent={handleCodeSent} />;
+            ) : <EnterPhoneNumberScreen onBack={handleBackToVerificationMain} onCodeSent={handleCodeSent} />;
           case 'main':
           default:
             return <ProfileScreen 
@@ -1555,21 +1396,21 @@ const AppContent: React.FC = () => {
       case 'wallet':
         switch(walletView) {
           case 'addAmount':
-            return <AddAmountScreen onBack={goBack} onProceed={handleProceedToAddMoney} profile={profile} />;
+            return <AddAmountScreen onBack={handleBackToWalletMain} onProceed={handleProceedToAddMoney} profile={profile} />;
           case 'addMoney':
-            return addAmount ? <AddMoneyScreen onBack={goBack} amount={addAmount} profile={profile} email={session?.user?.email} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
+            return addAmount ? <AddMoneyScreen onBack={() => setWalletView('addAmount')} amount={addAmount} profile={profile} email={session?.user?.email} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
           case 'transfer':
-            return <TransferScreen onBack={goBack} onProceed={handleProceedToTransferConfirm} profile={profile} onNavigateToVerification={() => { setActiveView('profile'); setProfileView('accountVerification'); }} />;
+            return <TransferScreen onBack={handleBackToWalletMain} onProceed={handleProceedToTransferConfirm} profile={profile} onNavigateToVerification={() => { setActiveView('profile'); setProfileView('accountVerification'); }} />;
            case 'transferConfirm':
-            return transferDetails ? <TransferConfirmScreen onBack={goBack} onConfirm={handleConfirmTransfer} details={transferDetails} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
+            return transferDetails ? <TransferConfirmScreen onBack={() => setWalletView('transfer')} onConfirm={handleConfirmTransfer} details={transferDetails} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
           case 'transferSuccess':
-            return completedTransaction ? <TransferSuccessScreen onDone={goBack} transaction={completedTransaction} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
+            return completedTransaction ? <TransferSuccessScreen onDone={handleBackToWalletMain} transaction={completedTransaction} /> : <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
           case 'statement':
-            return <StatementScreen onBack={goBack} profile={profile} onViewTransactionDetail={handleViewTransactionDetail} />;
+            return <StatementScreen onBack={handleBackToWalletMain} profile={profile} onViewTransactionDetail={handleViewTransactionDetail} />;
           case 'statementDetail':
-            return completedTransaction ? <StatementDetailScreen onDone={goBack} transaction={completedTransaction} /> : <StatementScreen onBack={goBack} profile={profile} onViewTransactionDetail={handleViewTransactionDetail} />;
+            return completedTransaction ? <StatementDetailScreen onDone={() => setWalletView('statement')} transaction={completedTransaction} /> : <StatementScreen onBack={handleBackToWalletMain} profile={profile} onViewTransactionDetail={handleViewTransactionDetail} />;
           case 'withdraw':
-            return <WithdrawScreen onBack={goBack} onNavigateToVerification={() => { setActiveView('profile'); setProfileView('accountVerification')}} profile={profile} />;
+            return <WithdrawScreen onBack={handleBackToWalletMain} onNavigateToVerification={() => { setActiveView('profile'); setProfileView('accountVerification')}} profile={profile} />;
           case 'main':
           default:
             return <WalletScreen onNavigate={handleNavigateWallet} profile={profile} />;
@@ -1578,23 +1419,23 @@ const AppContent: React.FC = () => {
         if (selectedExploreItem) {
             return <ServiceDetailScreen 
                         item={selectedExploreItem}
-                        groups={allGroups}
-                        onBack={goBack}
+                        groups={exploreGroups}
+                        onBack={handleBackFromExploreDetail}
                         onSelectGroup={handleSelectGroup}
                         onSelectExploreItem={handleSelectExploreItem}
                     />;
         }
         switch(exploreView) {
             case 'createGroup':
-                return <CreateGroupScreen onBack={goBack} onSelectService={handleNavigateToConfigureGroup} />;
+                return <CreateGroupScreen onBack={handleBackToExploreMain} onSelectService={handleNavigateToConfigureGroup} />;
             case 'configureGroup':
                 if (newGroupDetails?.service) {
-                    return <ConfigureGroupScreen onBack={goBack} service={newGroupDetails.service} onContinue={handleProceedToCredentials} />;
+                    return <ConfigureGroupScreen onBack={handleBackToCreateGroup} service={newGroupDetails.service} onContinue={handleProceedToCredentials} />;
                 }
                 return <ExploreScreen groups={exploreGroups} onSelectGroup={handleSelectGroup} onNavigateToCreateGroup={() => handleNavigateExplore('createGroup')} profile={profile} myGroups={myGroups} onSelectExploreItem={handleSelectExploreItem} />;
             case 'groupCredentials':
                 if (newGroupDetails) {
-                    return <GroupCredentialsScreen onBack={goBack} groupDetails={newGroupDetails} onFinish={handleFinishGroupCreation} />;
+                    return <GroupCredentialsScreen onBack={() => setExploreView('configureGroup')} groupDetails={newGroupDetails} onFinish={handleFinishGroupCreation} />;
                 }
                  return <ExploreScreen groups={exploreGroups} onSelectGroup={handleSelectGroup} onNavigateToCreateGroup={() => handleNavigateExplore('createGroup')} profile={profile} myGroups={myGroups} onSelectExploreItem={handleSelectExploreItem} />;
             case 'main':
@@ -1606,7 +1447,7 @@ const AppContent: React.FC = () => {
             if (selectedNetflixItem) {
                 return <NetflixDetailScreen 
                             item={selectedNetflixItem}
-                            onBack={goBack}
+                            onBack={() => setSelectedNetflixItem(null)}
                             onSelectGroup={handleSelectGroup}
                             onSelectItem={(item) => setSelectedNetflixItem(item)}
                             myList={myList}
@@ -1620,7 +1461,7 @@ const AppContent: React.FC = () => {
                         />
             }
             return <NetflixScreen 
-                        onBack={goBack}
+                        onBack={() => setViewingNetflix(false)}
                         onSelectItem={(item) => setSelectedNetflixItem(item)}
                         myList={myList}
                         onViewAllGroups={handleViewAllNetflixGroups}
@@ -1630,14 +1471,14 @@ const AppContent: React.FC = () => {
             if (selectedBrand) {
                 return <BrandDetailScreen
                     brand={selectedBrand}
-                    onBack={goBack}
+                    onBack={() => setSelectedBrand(null)}
                     onSelectExploreItem={handleSelectDisneyPlusContentItem}
                 />
             }
             if (selectedDisneyPlusItem) {
                 return <DisneyPlusDetailScreen 
                             item={selectedDisneyPlusItem}
-                            onBack={goBack}
+                            onBack={() => setSelectedDisneyPlusItem(null)}
                             onSelectGroup={handleSelectGroup}
                             onSelectItem={(item) => setSelectedDisneyPlusItem(item)}
                             myList={myList}
@@ -1651,7 +1492,7 @@ const AppContent: React.FC = () => {
                         />
             }
             return <DisneyPlusScreen 
-                        onBack={goBack}
+                        onBack={() => setViewingDisneyPlus(false)}
                         onSelectItem={(item) => {
                             setSelectedDisneyPlusItem(item);
                         }}
@@ -1662,7 +1503,7 @@ const AppContent: React.FC = () => {
             if (selectedPrimeVideoItem) {
                 return <PrimeVideoDetailScreen
                             item={selectedPrimeVideoItem}
-                            onBack={goBack}
+                            onBack={() => setSelectedPrimeVideoItem(null)}
                             onSelectGroup={handleSelectGroup}
                             onSelectItem={(item) => setSelectedPrimeVideoItem(item)}
                             myList={myList}
@@ -1676,7 +1517,7 @@ const AppContent: React.FC = () => {
                         />
             }
             return <PrimeVideoScreen 
-                        onBack={goBack}
+                        onBack={() => setViewingPrimeVideo(false)}
                         onSelectItem={(item) => setSelectedPrimeVideoItem(item)}
                         myList={myList}
                     />;
@@ -1685,7 +1526,7 @@ const AppContent: React.FC = () => {
             if (selectedMaxItem) {
                 return <MaxDetailScreen
                             item={selectedMaxItem}
-                            onBack={goBack}
+                            onBack={() => setSelectedMaxItem(null)}
                             onSelectGroup={handleSelectGroup}
                             onSelectItem={(item) => setSelectedMaxItem(item)}
                             myList={myList}
@@ -1699,7 +1540,7 @@ const AppContent: React.FC = () => {
                         />
             }
             return <MaxScreen
-                        onBack={goBack}
+                        onBack={() => setViewingMax(false)}
                         onSelectItem={(item) => setSelectedMaxItem(item)}
                         myList={myList}
                     />;
@@ -1708,7 +1549,7 @@ const AppContent: React.FC = () => {
             onSelectMovie={(movieId) => handleSelectExploreItem({ type: 'movie', id: movieId.toString() })} 
             onSelectSeries={(seriesId) => alert(`Detalhes para a série ID ${seriesId} serão adicionados em breve!`)}
             onSelectProvider={handleSelectProvider}
-            allGroups={allGroups}
+            allGroups={exploreGroups}
             onSelectGroup={handleSelectGroup}
         />;
       case 'home':
@@ -1725,14 +1566,12 @@ const AppContent: React.FC = () => {
             onNavigateToSupport={() => { setActiveView('profile'); handleNavigateProfile('support'); }}
             onNavigateToAddMoney={() => { setActiveView('wallet'); handleNavigateWallet('addAmount'); }}
             onEnterAdminMode={handleEnterAdminMode}
-            notificationCount={unreadCount}
-            onNotificationClick={handleNotificationClick}
-            onViewAllGroups={() => setViewingAllMyGroups(true)}
         />;
     }
   };
   
-  const isNavHidden = isThemeModalOpen || isAdminView || isIntroPlaying || !session || !!activeDevScreen || !!selectedGroup || isInPaymentFlow || profileView !== 'main' || walletView !== 'main' || exploreView !== 'main' || !!activeChatGroup || !!selectedMyGroup || !!selectedExploreItem || !!selectedMovie || !!selectedProvider || viewingNetflix || viewingDisneyPlus || viewingPrimeVideo || viewingMax || !!selectedBrand || viewingAllMyGroups;
+  const isIntroPlaying = !!introState;
+  const isNavHidden = isThemeModalOpen || isAdminView || isIntroPlaying || !session || !!activeDevScreen || !!selectedGroup || isInPaymentFlow || profileView !== 'main' || walletView !== 'main' || exploreView !== 'main' || !!activeChatGroup || !!selectedMyGroup || !!selectedExploreItem || !!selectedMovie || !!selectedProvider || viewingNetflix || viewingDisneyPlus || viewingPrimeVideo || viewingMax || !!selectedBrand;
 
   return (
     <div onClick={unlockAudio} className={`font-sans max-w-md mx-auto min-h-screen ${theme === 'dark' ? 'dark' : ''}`}>
@@ -1741,8 +1580,6 @@ const AppContent: React.FC = () => {
                 title={notification.title}
                 body={notification.body}
                 onClose={() => setNotification(null)}
-                onClick={handleNotificationToastClick}
-                data={notification.data}
             />
         )}
        <ThemeSelectionModal isOpen={isThemeModalOpen} onClose={() => setIsThemeModalOpen(false)} />

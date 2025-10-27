@@ -1,10 +1,10 @@
+// Inicializa o cliente admin do Supabase.
+// Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente do seu projeto Vercel.
 
 export default async function handler(req, res) {
-  const { MercadoPagoConfig, Payment } = await import('https://esm.sh/mercadopago@2.9.0');
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.75.1');
+  const { MercadoPagoConfig, Payment } = await import("https://esm.sh/mercadopago");
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.4/+esm');
 
-  // Inicializa o cliente admin do Supabase.
-  // Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente do seu projeto Vercel.
   const supabaseAdmin = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY

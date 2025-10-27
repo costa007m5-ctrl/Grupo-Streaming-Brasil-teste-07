@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import type { Group, GroupMember, GroupRule, Profile, Review } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import React, { useState } from 'react';
+import type { Group, GroupMember, GroupRule } from '../types';
 import { 
-    ArrowLeftIcon,
+    ArrowLeftIcon, 
+    HeartIcon, 
+    ShareIcon, 
     StarIcon, 
+    CheckCircleIcon,
     CheckBadgeIcon,
     UserCircleIcon,
     PlusIcon,
@@ -44,43 +46,26 @@ const GroupInfo: React.FC<{ group: Group }> = ({ group }) => {
                     <p className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>R$ {group.price.toFixed(2).replace('.', ',')}<span className={`text-base font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>/mês</span></p>
                 </div>
             </div>
-            <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} leading-relaxed`}>Grupo para dividir a assinatura de {group.name}.</p>
+            <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} leading-relaxed`}>Grupo para dividir a assinatura de {group.name}. Anfitrião: {group.host_name}.</p>
         </div>
     );
 };
 
-const GroupHost: React.FC<{ hostId: string, hostName: string, hostAvatar: string }> = ({ hostId, hostName, hostAvatar }) => {
-    const { theme } = useTheme();
-    const [hostProfile, setHostProfile] = useState<Profile | null>(null);
 
-    useEffect(() => {
-        const fetchHostProfile = async () => {
-            const { data, error } = await supabase.from('profiles').select('host_rating_avg, host_rating_count').eq('id', hostId).single();
-            if (error) {
-                console.error("Error fetching host profile for rating:", error);
-            } else {
-                setHostProfile(data as Profile);
-            }
-        };
-        fetchHostProfile();
-    }, [hostId]);
-    
+const GroupHost: React.FC<{ group: Group }> = ({ group }) => {
+    const { theme } = useTheme();
     return (
         <div className={`space-y-3 p-4 rounded-xl shadow-sm ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
             <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>Anfitrião</h2>
             <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
                 <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-3">
-                        <img src={hostAvatar} alt={hostName} className="w-12 h-12 rounded-full" />
+                        <img src={group.members_list[0]?.avatarUrl} alt={group.host_name} className="w-12 h-12 rounded-full" />
                         <div>
-                            <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{hostName}</p>
-                            {(hostProfile?.host_rating_count ?? 0) > 0 && (
-                                <div className="flex items-center space-x-1 mt-0.5">
-                                    <StarIcon className="w-4 h-4 text-yellow-400" solid />
-                                    <span className={`font-bold text-sm ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{hostProfile?.host_rating_avg?.toFixed(1)}</span>
-                                    <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>({hostProfile?.host_rating_count} avaliações)</span>
-                                </div>
-                            )}
+                            <div className="flex items-center space-x-1">
+                                <p className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{group.host_name}</p>
+                            </div>
+                             <p className="text-xs text-gray-400">Membro desde Março 2023</p>
                         </div>
                     </div>
                 </div>
@@ -153,33 +138,6 @@ const GroupRules: React.FC<{ rules: GroupRule[] }> = ({ rules }) => {
     );
 };
 
-const ReviewItem: React.FC<{ review: Review }> = ({ review }) => (
-    <div className="py-3">
-        <div className="flex items-center space-x-2">
-            <img src={review.user_avatar_url} alt={review.user_name} className="w-8 h-8 rounded-full" />
-            <span className="font-semibold text-sm">{review.user_name}</span>
-        </div>
-        <div className="flex items-center space-x-1 my-1.5">
-            {[...Array(5)].map((_, i) => <StarIcon key={i} className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400' : 'text-gray-300'}`} solid />)}
-        </div>
-        <p className="text-sm text-gray-600">{review.comment}</p>
-    </div>
-);
-
-const GroupReviews: React.FC<{ reviews?: Review[] }> = ({ reviews }) => {
-    const { theme } = useTheme();
-    if (!reviews || reviews.length === 0) return null;
-
-    return (
-        <div className={`space-y-3 p-4 rounded-xl shadow-sm ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
-            <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>Avaliações do Grupo</h2>
-            <div className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-100'}`}>
-                {reviews.map(review => <ReviewItem key={review.id} review={review} />)}
-            </div>
-        </div>
-    );
-};
-
 const GroupDetailFooter: React.FC<{ group: Group; onParticipate: () => void; }> = ({ group, onParticipate }) => {
     const { theme } = useTheme();
     return (
@@ -219,10 +177,9 @@ const GroupDetailScreen: React.FC<{ group: Group; onBack: () => void; onProceedT
             <GroupDetailHeader onBack={onBack} group={group} onReport={() => setIsReportModalOpen(true)} />
             <main className="pb-32 p-4 space-y-4">
                 <GroupInfo group={group} />
-                <GroupHost hostId={group.host_id!} hostName={group.host_name} hostAvatar={group.members_list[0]?.avatarUrl} />
+                <GroupHost group={group} />
                 <GroupMembers group={group} />
                 <GroupRules rules={group.rules} />
-                <GroupReviews reviews={group.reviews} />
             </main>
             <GroupDetailFooter group={group} onParticipate={() => setIsConfirmationModalOpen(true)} />
             {isConfirmationModalOpen && (

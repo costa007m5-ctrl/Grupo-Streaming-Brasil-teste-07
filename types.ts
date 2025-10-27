@@ -14,16 +14,6 @@ export interface ChatMessage {
   isYou: boolean;
 }
 
-export interface Review {
-  id: string; // uuid
-  user_id: string;
-  user_name: string;
-  user_avatar_url: string;
-  rating: number; // 1-5
-  comment: string;
-  created_at: string;
-}
-
 export interface Profile {
   id: string; // uuid
   full_name: string;
@@ -43,11 +33,6 @@ export interface Profile {
   city?: string;
   state?: string;
   created_at?: string;
-  fcm_tokens?: string[];
-  is_profile_private?: boolean;
-  is_searchable?: boolean;
-  host_rating_avg?: number;
-  host_rating_count?: number;
 }
 
 export interface Group {
@@ -68,7 +53,6 @@ export interface Group {
     password?: string;
   };
   host_id?: string;
-  reviews?: Review[];
 }
 
 export interface Activity {
@@ -229,30 +213,4 @@ export interface SupportTicket {
   // Joined from profiles table for admin convenience
   user_full_name?: string;
   user_avatar_url?: string;
-}
-
-// FIX: Moved shared types from App.tsx to types.ts to fix module resolution errors.
-export type AppView = 'home' | 'explore' | 'movies' | 'wallet' | 'profile';
-export type ProfileView = 
-  'main' | 'settings' | 'support' | 'editProfile' | 'notifications' | 
-  'security' | 'reviews' | 'history' | 
-  'twoFactorAuth' | 'biometrics' | 'changePassword' | 'connectedDevices' | 
-  'profilePrivacy' | 'personalData' | 'activityHistory' |
-  'accountVerification' | 'personalInfo' | 'address' | 'documentUpload' | 'selfie' | 
-  'enterPhoneNumber' | 'phoneVerification' | 'changeAvatar' | 'soundSettings' | 'designSettings';
-
-export type WalletView = 'main' | 'addAmount' | 'addMoney' | 'transfer' | 'transferConfirm' | 'statement' | 'withdraw' | 'transferSuccess' | 'statementDetail';
-export type ExploreView = 'main' | 'createGroup' | 'configureGroup' | 'groupCredentials';
-export type AuthView = 'welcome' | 'login' | 'signup' | 'forgotPassword' | 'updatePassword' | 'terms';
-export type DevScreen = 'sql' | 'payment';
-export type ExploreDetailItem = { type: 'service' | 'category' | 'movie'; id: string };
-
-export interface ProfileUpdateData {
-    name: string;
-    phone: string;
-    birthDate: string;
-}
-
-export interface VerificationData {
-    phoneNumber: string;
 }

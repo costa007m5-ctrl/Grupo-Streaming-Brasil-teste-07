@@ -16,6 +16,7 @@ const offlineFallbackPage = 'offline.html';
 precacheAndRoute([
   { url: '/', revision: null },
   { url: '/index.html', revision: null },
+  { url: '/index.tsx', revision: null },
   { url: '/manifest.json', revision: null },
   { url: 'https://img.icons8.com/fluency/192/play-button-circled.png', revision: null },
   { url: offlineFallbackPage, revision: null },
@@ -145,37 +146,10 @@ const messaging = firebase.messaging();
 // Push Notification Handlers
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  
-  // Prefer data payload for more control, fallback to notification payload
-  const notificationData = payload.data || payload.notification || {};
-  
-  const notificationTitle = notificationData.title || 'Grupo Streaming Brasil';
-  
-  let urlToOpen = notificationData.url || '/';
-  let actions = [
-    { action: 'explore', title: 'Explorar Grupos' },
-    { action: 'open', title: 'Abrir App' }
-  ];
-  let tag = 'gsb-notification';
-
-  // If it's a chat message, construct the deep link URL and customize actions
-  if (notificationData.type === 'chat_message' && notificationData.groupId) {
-    urlToOpen = `/?chatGroupId=${notificationData.groupId}`;
-    actions = [{ action: 'open_chat', title: 'Responder' }];
-    tag = `chat-${notificationData.groupId}`; // Group notifications for the same chat
-  }
-  
+  const notificationTitle = payload.notification.title;
   const notificationOptions = {
-    body: notificationData.body,
-    icon: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-    badge: 'https://img.icons8.com/fluency/192/play-button-circled.png',
-    image: notificationData.image,
-    vibrate: [200, 100, 200],
-    tag: tag,
-    actions: actions,
-    data: {
-        url: urlToOpen // Pass the final URL here
-    }
+    body: payload.notification.body,
+    icon: payload.notification.icon || 'https://img.icons8.com/fluency/192/play-button-circled.png'
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
@@ -183,42 +157,16 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    
-    // Default URL is from notification data, or root
-    let openUrl = event.notification.data.url || '/';
-
-    // Check which action was clicked
-    if (event.action === 'explore') {
-        openUrl = '/?view=explore';
-    } else if (event.action === 'open_chat' || event.action === 'open') {
-        // The URL is already correctly set in the data payload, so do nothing extra
-    }
-
-    const urlToOpen = new URL(openUrl, self.location.origin).href;
-
-    const promiseChain = clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-    }).then((windowClients) => {
-        let matchingClient = null;
-        for (let i = 0; i < windowClients.length; i++) {
-            const windowClient = windowClients[i];
-            // Check if a client for the base URL is already open
-            if (new URL(windowClient.url).origin === self.location.origin) {
-                matchingClient = windowClient;
-                break;
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            if (clientList.length > 0) {
+                let client = clientList[0];
+                for (let i = 0; i < clientList.length; i++) {
+                    if (clientList[i].focused) client = clientList[i];
+                }
+                return client.focus();
             }
-        }
-
-        if (matchingClient) {
-            // If a window is already open, navigate it to the target URL and focus it
-            matchingClient.navigate(urlToOpen);
-            return matchingClient.focus();
-        } else {
-            // Otherwise, open a new window
-            return clients.openWindow(urlToOpen);
-        }
-    });
-
-    event.waitUntil(promiseChain);
+            return clients.openWindow('/');
+        })
+    );
 });
