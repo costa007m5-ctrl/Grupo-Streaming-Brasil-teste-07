@@ -4,7 +4,7 @@
 
 
 export default async function handler(req, res) {
-  const { GoogleGenAI, Modality } = await import('https://cdn.jsdelivr.net/npm/@google/genai@latest/dist/index.js');
+  const { GoogleGenAI, Modality, Type } = await import('https://cdn.jsdelivr.net/npm/@google/genai@latest/dist/index.js');
   // Configura os cabeçalhos CORS para permitir chamadas do seu frontend
   res.setHeader('Access-Control-Allow-Origin', '*'); // Em produção, restrinja para o seu domínio
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -95,15 +95,23 @@ export default async function handler(req, res) {
         const modelConfig = {
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: "application/json" },
+            config: {},
         };
         if (systemInstruction) modelConfig.config.systemInstruction = systemInstruction;
-        if (responseSchema) modelConfig.config.responseSchema = responseSchema;
+        
+        if (responseSchema) {
+          modelConfig.config.responseMimeType = "application/json";
+          modelConfig.config.responseSchema = responseSchema;
+        }
 
         const response = await ai.models.generateContent(modelConfig);
-        const jsonResponse = JSON.parse(response.text);
-
-        return res.status(200).json(jsonResponse);
+        
+        if (responseSchema) {
+            const jsonResponse = JSON.parse(response.text);
+            return res.status(200).json(jsonResponse);
+        } else {
+            return res.status(200).json({ text: response.text });
+        }
       }
     }
   } catch (error) {

@@ -86,6 +86,7 @@ const BrandDetailScreen = lazy(() => import('./components/BrandDetailScreen'));
 const AdminScreen = lazy(() => import('./components/AdminScreen'));
 const TermsOfUseScreen = lazy(() => import('./components/TermsOfUseScreen'));
 const DesignSettingsScreen = lazy(() => import('./components/DesignSettingsScreen'));
+const FaqScreen = lazy(() => import('./components/FaqScreen'));
 
 
 interface TMDBMovie {
@@ -107,7 +108,7 @@ export type ProfileView =
   'twoFactorAuth' | 'biometrics' | 'changePassword' | 'connectedDevices' | 
   'profilePrivacy' | 'personalData' | 'activityHistory' |
   'accountVerification' | 'personalInfo' | 'address' | 'documentUpload' | 'selfie' | 
-  'enterPhoneNumber' | 'phoneVerification' | 'changeAvatar' | 'soundSettings' | 'designSettings';
+  'enterPhoneNumber' | 'phoneVerification' | 'changeAvatar' | 'soundSettings' | 'designSettings' | 'faq';
 
 export type WalletView = 'main' | 'addAmount' | 'addMoney' | 'transfer' | 'transferConfirm' | 'statement' | 'withdraw' | 'transferSuccess' | 'statementDetail';
 export type ExploreView = 'main' | 'createGroup' | 'configureGroup' | 'groupCredentials';
@@ -165,8 +166,13 @@ const AppContent: React.FC = () => {
   const [viewingMax, setViewingMax] = useState(false);
   const [selectedMaxItem, setSelectedMaxItem] = useState<ContentItem | null>(null);
 
+  // FAQ state
+  const [faqScreenMode, setFaqScreenMode] = useState<{ mode: 'category' | 'all', categoryId?: string } | null>(null);
+
   // Notifications
   const [notification, setNotification] = useState<{title: string, body: string} | null>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   // PWA Install Prompt
@@ -430,6 +436,8 @@ const AppContent: React.FC = () => {
                 title: payload.notification.title || 'Nova Notificação',
                 body: payload.notification.body || ''
             });
+            setNotifications(prev => [payload.notification, ...prev]);
+            setUnreadCount(prev => prev + 1);
         }
     });
 
@@ -480,6 +488,12 @@ const AppContent: React.FC = () => {
   const handleDismissNotificationPrompt = () => {
       setShowNotificationPrompt(false);
       sessionStorage.setItem('notification_prompt_dismissed', 'true');
+  };
+  
+  const handleNotificationClick = () => {
+    setActiveView('profile');
+    handleNavigateProfile('notifications');
+    setUnreadCount(0);
   };
 
   useEffect(() => {
@@ -544,10 +558,27 @@ const AppContent: React.FC = () => {
 
   const handleNavigateProfile = (view: ProfileView) => {
     setProfileView(view);
+    setFaqScreenMode(null);
   };
-  const handleBackToProfileMain = () => setProfileView('main');
+  const handleBackToProfileMain = () => {
+    setProfileView('main');
+    setFaqScreenMode(null);
+  }
+  const handleBackToSupportMain = () => {
+    setProfileView('support');
+    setFaqScreenMode(null);
+  }
   const handleBackToSecurity = () => setProfileView('security');
   const handleBackToVerificationMain = () => setProfileView('accountVerification');
+  
+  const handleNavigateToFaqCategory = (categoryId: string) => {
+      setFaqScreenMode({ mode: 'category', categoryId });
+      setProfileView('faq');
+  };
+  const handleNavigateToAllFaqs = () => {
+      setFaqScreenMode({ mode: 'all' });
+      setProfileView('faq');
+  };
   
   const handleCodeSent = (phoneNumber: string) => {
     setVerificationData({ phoneNumber });
@@ -1305,7 +1336,13 @@ const AppContent: React.FC = () => {
           case 'changeAvatar':
             return <ChangeAvatarScreen onBack={() => setProfileView('editProfile')} profile={profile} onSave={handleUpdateAvatar} />;
           case 'support':
-            return <SupportScreen onBack={handleBackToProfileMain} />;
+            return <SupportScreen 
+              onBack={handleBackToProfileMain}
+              onNavigateToCategory={handleNavigateToFaqCategory}
+              onNavigateToAll={handleNavigateToAllFaqs}
+            />;
+          case 'faq':
+            return faqScreenMode ? <FaqScreen mode={faqScreenMode.mode} categoryId={faqScreenMode.categoryId} onBack={handleBackToSupportMain} /> : <div/>;
           case 'settings':
             return <SettingsScreen onBack={handleBackToProfileMain} onNavigateToSupport={() => handleNavigateProfile('support')} />;
           case 'notifications':
@@ -1566,6 +1603,8 @@ const AppContent: React.FC = () => {
             onNavigateToSupport={() => { setActiveView('profile'); handleNavigateProfile('support'); }}
             onNavigateToAddMoney={() => { setActiveView('wallet'); handleNavigateWallet('addAmount'); }}
             onEnterAdminMode={handleEnterAdminMode}
+            notificationCount={unreadCount}
+            onNotificationClick={handleNotificationClick}
         />;
     }
   };
